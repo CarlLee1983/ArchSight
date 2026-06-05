@@ -107,17 +107,29 @@ clarity and testability:
   signatures). `Highlight` routes Go to the Tree-sitter highlighter; everything
   else to the existing keyword/plain-text behavior.
 - `treesitter.go` — Tree-sitter engine wrapper:
-  - Lazy shared init via `sync.Once`: build the `TreeSitter` Wasm instance and
-    load the `go` language **on first highlight request only** (never at
-    process start), so startup latency and idle RSS are unchanged.
-  - A `sync.Mutex` serializes parse+query calls (wazero modules are not
-    goroutine-safe; the read-only, on-demand workload makes serialization
-    acceptable).
+  - **Fresh instance per highlight call.** Each `highlightGo` call does
+    `sitter.New(nil, nil)`, loads `go`, compiles the query, parses, queries, then
+    drops the instance (and `Close()`s the parser). The library caches the
+    *compiled* Wasm module process-globally via its own `sync.Once`, so only the
+    **first** highlight in the process pays the decompress+compile cost
+    (~90 ms, measured); subsequent calls are ~6–13 ms each (measured). Nothing is
+    instantiated at process start, so startup latency and pre-open idle RSS are
+    unchanged.
+  - **Why not a shared reused instance:** the pinned binding exposes no
+    `Close`/free for `Tree`/`QueryCursor`/module, so reusing one instance leaks
+    Wasm linear memory and **traps (`wasm error: unreachable`) after ~270 parses
+    of a 4 KB file** (measured). A fresh per-call instance keeps memory bounded
+    (500 sequential highlights ran with flat ~10 ms latency, no trap) because the
+    anonymous module is reclaimed after each call. No mutex is needed — there is
+    no shared mutable engine, and `sitter.New` / `wazero` instantiation is safe to
+    call concurrently (the global compile is guarded by the library's `sync.Once`).
   - `highlightGo(content) []Token`: parse → run the embedded `highlights.scm`
     query against the root node → collect captures → map capture name to a
     canonical token type → resolve overlaps → emit non-overlapping `Token`s.
   - If init or parse fails for any reason, fall back to plain text (empty token
     list) — highlighting must never crash the core or block file viewing.
+  - A size cap (`maxHighlightBytes`, 1 MiB) skips highlighting for very large
+    files (return empty tokens → plain text), bounding per-call work.
 - `queries/go/highlights.scm` — vendored Go highlight query, `go:embed`-ed.
 - `mapping.go` — capture-name → canonical-type table and the overlap resolver.
 - `offsets.go` — byte-offset → 1-based (line, column) conversion that is correct
@@ -187,8 +199,10 @@ Swift `SyntaxToken`/`OpenFileResult` need no schema change.
   idle" and "no orphan after SIGTERM" assertions still hold.
 - Per-file highlight results are cached in memory keyed by (path, content
   identity) and invalidated on reopen/disk change, matching Phase 4's stated
-  caching behavior. Optional safety valve: files above a size threshold skip
-  highlighting and render as plain text.
+  caching behavior. This also reduces instance churn (a cache hit skips
+  `sitter.New` entirely).
+- Files above `maxHighlightBytes` (1 MiB) skip highlighting and render as plain
+  text, bounding per-call parse cost and Wasm memory.
 
 ## Components and Interfaces
 
@@ -216,6 +230,10 @@ Swift `SyntaxToken`/`OpenFileResult` need no schema change.
   extensions return plain text.
 - Lazy init: no Wasm instance is created until the first Go highlight; a parse
   failure degrades to empty tokens without panicking.
+- **Reuse/leak regression:** highlighting a ~4 KB Go file 400 times in a row
+  succeeds (guards against the ~270-parse Wasm trap that single-instance reuse
+  exhibits).
+- A file larger than `maxHighlightBytes` returns plain text (empty tokens).
 
 ### Swift tests (`apps/macos`)
 
@@ -250,10 +268,13 @@ Swift `SyntaxToken`/`OpenFileResult` need no schema change.
   later is local.
 - **Binary +1.5 MB from unused bundled grammars** — accepted now; revisit Wasm
   slimming (needs a C/Wasm toolchain) once the language set is locked.
-- **wazero concurrency** — serialize highlight calls with a mutex; revisit a
-  small instance pool only if profiling shows contention.
-- **Large-file highlight cost** — in-memory cache plus an optional size cap that
-  degrades to plain text.
+- **Wasm memory leak / trap on instance reuse** (measured: trap after ~270
+  parses) — mitigated by a fresh instance per highlight call; covered by a
+  regression test that highlights well past that count. Revisit if a future
+  binding release adds `Close`/free APIs (would let us reuse one instance for
+  ~1 ms/parse).
+- **Large-file highlight cost** — in-memory cache plus the `maxHighlightBytes`
+  cap that degrades to plain text.
 - **Query/grammar version drift** — vendor a `highlights.scm` matching the
   bundled grammar revision; record both in `third_party/README.md`.
 
