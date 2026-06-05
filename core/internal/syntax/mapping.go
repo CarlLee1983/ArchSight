@@ -36,8 +36,9 @@ type rawCapture struct {
 }
 
 // resolveTokens paints non-overlapping highlight spans (most specific/shortest
-// capture wins, ties broken by lower pattern index, then earlier start) and
-// coalesces consecutive same-type bytes into Tokens with 1-based line/column.
+// capture wins, ties broken by lower pattern index, then earlier start, then
+// type name) and coalesces consecutive same-type bytes into Tokens with 1-based
+// line/column.
 func resolveTokens(content string, caps []rawCapture, idx *lineColumnIndex) []Token {
 	n := len(content)
 	owner := make([]int16, n)
@@ -71,7 +72,10 @@ func resolveTokens(content string, caps []rawCapture, idx *lineColumnIndex) []To
 		if sorted[a].pattern != sorted[b].pattern {
 			return sorted[a].pattern < sorted[b].pattern
 		}
-		return sorted[a].start < sorted[b].start
+		if sorted[a].start != sorted[b].start {
+			return sorted[a].start < sorted[b].start
+		}
+		return sorted[a].typ < sorted[b].typ
 	})
 	for _, c := range sorted {
 		id := idFor(c.typ)

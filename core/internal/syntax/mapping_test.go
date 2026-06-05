@@ -26,22 +26,31 @@ func TestCanonicalType(t *testing.T) {
 	}
 }
 
-func TestResolveTokensPrefersShorterThenLowerPattern(t *testing.T) {
-	// content: identifier "greet" (bytes 0..5) captured as both function (pattern 0)
-	// and variable (pattern 2). variable maps to "" (skipped), function wins.
+func TestResolveTokensPrefersLowerPatternOnEqualSpan(t *testing.T) {
+	// Same byte span [0,5), equal length: function (pattern 0) vs type (pattern 1).
+	// Lower pattern index wins.
 	content := "greet"
 	idx := newLineColumnIndex(content)
 	caps := []rawCapture{
-		{start: 0, end: 5, pattern: 2, typ: ""},         // variable -> skipped upstream; pass typ "" to ensure it's ignored
-		{start: 0, end: 5, pattern: 0, typ: "function"}, // function
+		{start: 0, end: 5, pattern: 1, typ: "type"},
+		{start: 0, end: 5, pattern: 0, typ: "function"},
 	}
 	tokens := resolveTokens(content, caps, idx)
-	if len(tokens) != 1 {
-		t.Fatalf("want 1 token, got %d: %+v", len(tokens), tokens)
+	if len(tokens) != 1 || tokens[0].Type != "function" || tokens[0].StartColumn != 1 || tokens[0].EndColumn != 6 {
+		t.Fatalf("expected one function token cols 1..6, got %+v", tokens)
 	}
-	tok := tokens[0]
-	if tok.Type != "function" || tok.StartColumn != 1 || tok.EndColumn != 6 {
-		t.Fatalf("unexpected token: %+v", tok)
+}
+
+func TestResolveTokensMultilineToken(t *testing.T) {
+	content := "a\nb" // a raw-string-like span across the newline, bytes [0,3)
+	idx := newLineColumnIndex(content)
+	caps := []rawCapture{{start: 0, end: 3, pattern: 0, typ: "string"}}
+	tokens := resolveTokens(content, caps, idx)
+	if len(tokens) != 1 {
+		t.Fatalf("want 1 token, got %+v", tokens)
+	}
+	if tokens[0].StartLine != 1 || tokens[0].EndLine != 2 {
+		t.Fatalf("want token spanning lines 1->2, got %+v", tokens[0])
 	}
 }
 
