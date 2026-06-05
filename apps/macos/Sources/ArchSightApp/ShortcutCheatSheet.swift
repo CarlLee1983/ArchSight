@@ -6,6 +6,7 @@ import SwiftUI
 /// hints never drift from the tooltips.
 struct ShortcutCheatSheet: View {
     let onClose: () -> Void
+    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -38,6 +39,9 @@ struct ShortcutCheatSheet: View {
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .shadow(radius: 24)
+        .focusable()
+        .focused($focused)
+        .onAppear { focused = true }
         .onKeyPress(.escape) { onClose(); return .handled }
     }
 
