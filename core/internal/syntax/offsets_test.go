@@ -31,6 +31,14 @@ func TestLineColumnIndexUTF16Columns(t *testing.T) {
 	}
 }
 
+func TestLineColumnIndexEndOfFileNoTrailingNewline(t *testing.T) {
+	content := "abc\ndef" // no trailing newline; len == 7
+	idx := newLineColumnIndex(content)
+	if l, c := idx.at(len(content)); l != 2 || c != 4 {
+		t.Fatalf("at(len) = (%d,%d), want (2,4)", l, c)
+	}
+}
+
 func TestLineColumnIndexClamps(t *testing.T) {
 	idx := newLineColumnIndex("abc")
 	if l, c := idx.at(-5); l != 1 || c != 1 {

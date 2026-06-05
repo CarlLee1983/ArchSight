@@ -9,6 +9,8 @@ type lineColumnIndex struct {
 }
 
 func newLineColumnIndex(content string) *lineColumnIndex {
+	// Only '\n' starts a new line; a '\r' in a "\r\n" file is ordinary content,
+	// consistent with tree-sitter byte offsets.
 	starts := []int{0}
 	for i := 0; i < len(content); i++ {
 		if content[i] == '\n' {
