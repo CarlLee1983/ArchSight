@@ -184,6 +184,12 @@ Implementation status:
 - Added an initial thin syntax adapter for Go, Swift, TypeScript, and Markdown language detection, with keyword tokens for supported code files.
 - Unsupported languages degrade to plain text with an empty token list.
 - Tests cover supported file content/tokens, unsupported plain-text fallback, path traversal rejection, and ignored files outside the snapshot.
+- Go highlighting now uses real Tree-sitter via the cgo-free wazero binding
+  (`github.com/malivvan/tree-sitter`, pinned) with a vendored `tree-sitter-go`
+  `highlights.scm`; a fresh parser instance is built per highlight (the pinned
+  binding has no tree/cursor free APIs and a reused instance traps after ~270
+  parses). Swift/TypeScript/Markdown keep the keyword adapter; unknown
+  extensions stay plain text.
 
 Tasks:
 

@@ -59,6 +59,14 @@ reparented to launchd and is immune to pid reuse.
 Idle memory sits well under the 50MB target and no language server starts during
 workspace load.
 
+## Syntax highlighting performance
+
+Syntax highlighting parses on demand with a fresh Tree-sitter (wazero) instance
+per opened file: the first Go file in a session pays a one-time Wasm compile
+(~90 ms), subsequent files ~6–13 ms. Highlighting runs in-process (no child
+process) and does not affect idle memory, which is measured before any file is
+opened.
+
 ## A note on search cancellation
 
 The gate's cancellation check is best-effort timing: on small synthetic

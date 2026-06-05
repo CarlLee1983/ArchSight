@@ -35,7 +35,18 @@ Search cancellation uses request IDs: send `cancel` with the active `search` req
 
 The core implements `openFile` for ready workspace snapshots. It reads files on demand, rejects absolute paths and `..` traversal, and returns read-only content with preserved root identity.
 
-Syntax metadata currently comes from a small adapter under `core/internal/syntax`. The adapter detects Go, Swift, TypeScript, and Markdown by extension, emits initial keyword tokens for supported code files, and degrades unsupported languages to plain text. It intentionally keeps the IPC token schema stable so Tree-sitter grammars can replace the adapter without changing the macOS client contract.
+Syntax metadata is produced by `core/internal/syntax`:
+
+- **Go** uses real Tree-sitter via the cgo-free wazero binding
+  (`github.com/malivvan/tree-sitter`, pinned pseudo-version) with a vendored
+  `tree-sitter-go` `highlights.scm`. A fresh parser instance is built per
+  highlight call; the pinned binding has no tree/cursor free APIs and a reused
+  instance traps after ~270 parses.
+- **Swift, TypeScript, and Markdown** keep the keyword token adapter.
+- **Unknown extensions** degrade to plain text with an empty token list.
+
+The IPC token schema is stable across all three paths so adding further
+Tree-sitter grammars does not change the macOS client contract.
 
 ## Phase 5 Lazy LSP Lifecycle
 
