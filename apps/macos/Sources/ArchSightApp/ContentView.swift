@@ -248,6 +248,7 @@ struct ContentView: View {
     private func codeView(for tab: FileTab, scrollLine: Int?) -> some View {
         CodeTextView(
             content: tab.content,
+            tokens: tab.tokens,
             scrollToLine: scrollLine,
             onDefinition: { line, column in requestDefinition(on: tab, line: line, column: column) },
             onReferences: { line, column in requestReferences(on: tab, line: line, column: column) }
@@ -445,7 +446,7 @@ struct ContentView: View {
                 let tab = try await Task.detached {
                     try endpoint.makeController().loadFile(workspaceId: workspaceId, rootId: rootId, path: path)
                 }.value
-                state.openFile(rootID: tab.rootID, path: tab.path, content: tab.content)
+                state.openFile(rootID: tab.rootID, path: tab.path, content: tab.content, tokens: tab.tokens)
                 if let id = state.selectedTabID {
                     history.visit(id)
                 }

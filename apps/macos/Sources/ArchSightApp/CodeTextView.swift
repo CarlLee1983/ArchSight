@@ -8,12 +8,28 @@ import SwiftUI
 /// the tested `TextPosition` helper.
 struct CodeTextView: NSViewRepresentable {
     let content: String
+    var tokens: [SyntaxToken] = []
     var scrollToLine: Int?
     var onDefinition: (Int, Int) -> Void
     var onReferences: (Int, Int) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
+    }
+
+    /// Maps a canonical token type to a dynamic system color so highlighting
+    /// follows light/dark appearance automatically.
+    static func color(for type: String) -> NSColor {
+        switch type {
+        case "keyword": return .systemPink
+        case "string": return .systemRed
+        case "comment": return .secondaryLabelColor
+        case "number", "constant": return .systemOrange
+        case "function": return .systemBlue
+        case "type": return .systemPurple
+        case "operator": return .secondaryLabelColor
+        default: return .labelColor
+        }
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -58,7 +74,17 @@ struct CodeTextView: NSViewRepresentable {
         context.coordinator.onReferences = onReferences
 
         if textView.string != content {
-            textView.string = content
+            let attributed = NSMutableAttributedString(
+                string: content,
+                attributes: [
+                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+                    .foregroundColor: NSColor.labelColor,
+                ]
+            )
+            for span in SyntaxHighlighting.spans(for: tokens, in: content) where NSMaxRange(span.range) <= attributed.length {
+                attributed.addAttribute(.foregroundColor, value: Self.color(for: span.type), range: span.range)
+            }
+            textView.textStorage?.setAttributedString(attributed)
             textView.lastScrolledLine = nil
         }
         if let line = scrollToLine, line != textView.lastScrolledLine {
