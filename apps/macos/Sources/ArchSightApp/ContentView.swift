@@ -26,6 +26,7 @@ struct ContentView: View {
     @State private var pendingScrollLine: Int?
     @State private var markdownDisplayMode: MarkdownDisplayMode = .preview
     @State private var isQuickOpenPresented = false
+    @State private var isShortcutsPresented = false
     @Environment(ReadingPreferencesStore.self) private var readingStore
     @Environment(AppCore.self) private var appCore
 
@@ -70,6 +71,17 @@ struct ContentView: View {
                 }
             }
         }
+        .overlay {
+            if isShortcutsPresented {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.12)
+                        .ignoresSafeArea()
+                        .onTapGesture { isShortcutsPresented = false }
+                    ShortcutCheatSheet(onClose: { isShortcutsPresented = false })
+                        .padding(.top, 48)
+                }
+            }
+        }
         .focusedValue(\.workspaceCommands, WorkspaceCommandActions(
             openFolder: { openFolderPicker() },
             toggleSidebar: {
@@ -89,7 +101,8 @@ struct ContentView: View {
             goBack: { goBack() },
             goForward: { goForward() },
             nextTab: { selectAndRecord { state.selectNextTab() } },
-            previousTab: { selectAndRecord { state.selectPreviousTab() } }
+            previousTab: { selectAndRecord { state.selectPreviousTab() } },
+            showShortcuts: { isShortcutsPresented = true }
         ))
     }
 
@@ -100,19 +113,20 @@ struct ContentView: View {
         ToolbarItemGroup(placement: .navigation) {
             Button { goBack() } label: { Image(systemName: "chevron.left") }
                 .disabled(!history.canGoBack)
-                .help("Back")
+                .help("Back \(ShortcutCatalog.hint("back")?.chord.display ?? "")")
             Button { goForward() } label: { Image(systemName: "chevron.right") }
                 .disabled(!history.canGoForward)
-                .help("Forward")
+                .help("Forward \(ShortcutCatalog.hint("forward")?.chord.display ?? "")")
         }
         ToolbarItemGroup {
             Button { openFolderPicker() } label: {
                 Label("Open Folder", systemImage: "folder.badge.plus")
             }
+            .help("Open Folder \(ShortcutCatalog.hint("openFolder")?.chord.display ?? "")")
             Toggle(isOn: $isSplit) {
                 Label("Split", systemImage: "rectangle.split.2x1")
             }
-            .help("Compare two files side by side")
+            .help("Split Editor \(ShortcutCatalog.hint("splitEditor")?.chord.display ?? "") · compare two files")
             if state.isLoading {
                 ProgressView().controlSize(.small)
             }
