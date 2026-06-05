@@ -4,9 +4,6 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var state = WorkspaceViewState()
-    @State private var coreStatus: CoreSessionStatus = .disconnected
-    @State private var coreSession = CoreSessionFactory.fromEnvironment()
-    @State private var coreEndpoint: CoreServiceEndpoint?
     @State private var expandedPaths: Set<String> = []
     @State private var activeSearchTask: Task<Void, Never>? = nil
 
@@ -28,6 +25,9 @@ struct ContentView: View {
     @State private var pendingScrollLine: Int?
     @State private var markdownDisplayMode: MarkdownDisplayMode = .preview
     @Environment(ReadingPreferencesStore.self) private var readingStore
+    @Environment(AppCore.self) private var appCore
+
+    private var coreEndpoint: CoreServiceEndpoint? { appCore.endpoint }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -46,9 +46,6 @@ struct ContentView: View {
         .background { keyboardShortcuts }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: nil) { providers in
             handleDroppedFolders(providers)
-        }
-        .task {
-            connectCoreIfConfigured()
         }
         .safeAreaInset(edge: .bottom) {
             statusBar
@@ -189,6 +186,11 @@ struct ContentView: View {
                                     sidebarNode(node)
                                 }
                             }
+                        }
+                        .contextMenu {
+                            Button("Remove Folder from Workspace") { removeRoot(root) }
+                            Divider()
+                            Button("Close Folder") { closeWorkspace() }
                         }
                     }
                 }
@@ -373,7 +375,7 @@ struct ContentView: View {
             Divider()
             HStack {
                 HStack(spacing: 4) {
-                    switch coreStatus {
+                    switch appCore.status {
                     case .disconnected:
                         ArchSightIcon.StatusIndicator(color: .gray)
                         Text("Core offline").font(.system(size: 10)).foregroundColor(.secondary)
@@ -595,22 +597,6 @@ struct ContentView: View {
 
 
 
-    // MARK: - Core lifecycle
-
-    private func connectCoreIfConfigured() {
-        guard let coreSession else {
-            return
-        }
-        coreStatus = .connecting
-        do {
-            _ = try coreSession.connect()
-            coreStatus = coreSession.status
-            coreEndpoint = coreSession.serviceEndpoint
-        } catch {
-            coreStatus = coreSession.status
-        }
-    }
-
     // MARK: - Folder intake
 
     private func openFolderPicker() {
@@ -648,9 +634,14 @@ struct ContentView: View {
             return
         }
         let existing = state.roots.map(\.path)
-        let combined = existing + added.filter { !existing.contains($0) }
-        guard combined != existing else { return }
-        reopenWorkspace(paths: combined)
+        let fresh = added.filter { !existing.contains($0) }
+        guard !fresh.isEmpty else { return }
+
+        if state.workspaceId == nil {
+            reopenWorkspace(paths: existing + fresh)
+        } else {
+            addRoots(paths: fresh)
+        }
     }
 
     private func appendRootsLocally(_ paths: [String]) {
@@ -690,6 +681,55 @@ struct ContentView: View {
                 state.errorMessage = Self.describe(error)
             }
         }
+    }
+
+    private func addRoots(paths: [String]) {
+        guard let endpoint = coreEndpoint, let workspaceId = state.workspaceId else { return }
+        state.isLoading = true
+        state.errorMessage = nil
+        Task {
+            do {
+                let result = try await Task.detached {
+                    try endpoint.makeController().addRoots(workspaceId: workspaceId, paths: paths)
+                }.value
+                state.roots = result.roots
+                state.entries = result.entries
+                refreshSidebarTreeNodes()
+                state.isLoading = false
+            } catch {
+                state.isLoading = false
+                state.errorMessage = Self.describe(error)
+            }
+        }
+    }
+
+    private func removeRoot(_ root: WorkspaceRoot) {
+        // Drop the tabs/selection locally first so the UI updates immediately,
+        // then tell the core to forget the root and refresh from the result.
+        expandedPaths = expandedPaths.filter { path in
+            path != root.path && !path.hasPrefix(root.path + "/")
+        }
+        state.removeRoot(id: root.id)
+        refreshSidebarTreeNodes()
+        guard let endpoint = coreEndpoint, let workspaceId = state.workspaceId else { return }
+        Task {
+            do {
+                let result = try await Task.detached {
+                    try endpoint.makeController().removeRoot(workspaceId: workspaceId, rootId: root.id)
+                }.value
+                state.roots = result.roots
+                state.entries = result.entries
+                refreshSidebarTreeNodes()
+            } catch {
+                state.errorMessage = Self.describe(error)
+            }
+        }
+    }
+
+    private func closeWorkspace() {
+        expandedPaths = []
+        state.closeWorkspace()
+        refreshSidebarTreeNodes()
     }
 
     private func openEntry(_ entry: WorkspaceEntry) {
