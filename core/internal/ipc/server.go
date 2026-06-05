@@ -145,6 +145,10 @@ func (s *Server) dispatch(req Request) Response {
 		})
 	case "openWorkspace":
 		return s.openWorkspace(req)
+	case "addRoots":
+		return s.addRoots(req)
+	case "removeRoot":
+		return s.removeRoot(req)
 	case "listTree":
 		return s.listTree(req)
 	case "openFile":
@@ -170,6 +174,16 @@ type openWorkspaceResult struct {
 	WorkspaceID string           `json:"workspaceId"`
 	Status      workspace.Status `json:"status"`
 	Roots       []workspace.Root `json:"roots"`
+}
+
+type addRootsParams struct {
+	WorkspaceID string   `json:"workspaceId"`
+	Roots       []string `json:"roots"`
+}
+
+type removeRootParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	RootID      string `json:"rootId"`
 }
 
 type listTreeParams struct {
@@ -238,6 +252,57 @@ func (s *Server) openWorkspace(req Request) Response {
 		WorkspaceID: snapshot.ID,
 		Status:      snapshot.Status,
 		Roots:       snapshot.Roots,
+	})
+}
+
+func (s *Server) addRoots(req Request) Response {
+	var params addRootsParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return ErrorResponse(req.ID, NewError("invalid_params", err.Error()))
+	}
+	if params.WorkspaceID == "" {
+		return ErrorResponse(req.ID, NewError("invalid_params", "workspaceId is required"))
+	}
+	if _, ok := s.workspaces.Get(params.WorkspaceID); !ok {
+		return ErrorResponse(req.ID, NewError("not_found", "workspace not found: "+params.WorkspaceID))
+	}
+	snapshot, err := s.workspaces.AddRoots(context.Background(), params.WorkspaceID, params.Roots)
+	if err != nil {
+		return ErrorResponse(req.ID, NewError("invalid_params", err.Error()))
+	}
+	return SuccessResponse(req.ID, openWorkspaceResult{
+		WorkspaceID: snapshot.ID,
+		Status:      snapshot.Status,
+		Roots:       snapshot.Roots,
+	})
+}
+
+func (s *Server) removeRoot(req Request) Response {
+	var params removeRootParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return ErrorResponse(req.ID, NewError("invalid_params", err.Error()))
+	}
+	if params.WorkspaceID == "" || params.RootID == "" {
+		return ErrorResponse(req.ID, NewError("invalid_params", "workspaceId and rootId are required"))
+	}
+	snapshot, err := s.workspaces.RemoveRoot(params.WorkspaceID, params.RootID)
+	if err != nil {
+		return ErrorResponse(req.ID, NewError("not_found", err.Error()))
+	}
+	roots := snapshot.Roots
+	if roots == nil {
+		roots = []workspace.Root{}
+	}
+	entries := snapshot.Entries
+	if entries == nil {
+		entries = []workspace.Entry{}
+	}
+	return SuccessResponse(req.ID, listTreeResult{
+		WorkspaceID: snapshot.ID,
+		Status:      snapshot.Status,
+		Roots:       roots,
+		Entries:     entries,
+		Error:       snapshot.Error,
 	})
 }
 

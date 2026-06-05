@@ -12,6 +12,159 @@ import (
 	"github.com/cmg/archsight/core/internal/workspace"
 )
 
+func TestAddRootsRPCAppendsRoot(t *testing.T) {
+	dirA := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dirA, "a.txt"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dirB := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dirB, "b.txt"), []byte("b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	conn, cleanup := startTestServer(t)
+	defer cleanup()
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+
+	writeJSON(t, conn, map[string]any{
+		"id":     "1",
+		"method": "openWorkspace",
+		"params": map[string]any{"roots": []string{dirA}},
+	})
+	openResp := readResponse[struct {
+		WorkspaceID string           `json:"workspaceId"`
+		Status      workspace.Status `json:"status"`
+	}](t, reader)
+	if !openResp.OK {
+		t.Fatalf("openWorkspace failed: %+v", openResp.Error)
+	}
+	wsID := openResp.Result.WorkspaceID
+
+	waitForReadySocket(t, conn, reader, wsID)
+
+	writeJSON(t, conn, map[string]any{
+		"id":     "2",
+		"method": "addRoots",
+		"params": map[string]any{"workspaceId": wsID, "roots": []string{dirB}},
+	})
+	addResp := readResponse[struct {
+		WorkspaceID string           `json:"workspaceId"`
+		Status      workspace.Status `json:"status"`
+	}](t, reader)
+	if !addResp.OK {
+		t.Fatalf("addRoots failed: %+v", addResp.Error)
+	}
+
+	waitForReadySocket(t, conn, reader, wsID)
+
+	writeJSON(t, conn, map[string]any{
+		"id":     "3",
+		"method": "listTree",
+		"params": map[string]any{"workspaceId": wsID},
+	})
+	treeResp := readResponse[struct {
+		Roots []workspace.Root `json:"roots"`
+	}](t, reader)
+	if !treeResp.OK {
+		t.Fatalf("listTree failed: %+v", treeResp.Error)
+	}
+	if len(treeResp.Result.Roots) != 2 {
+		t.Fatalf("expected 2 roots after addRoots, got %d", len(treeResp.Result.Roots))
+	}
+}
+
+func TestRemoveRootRPCDropsRoot(t *testing.T) {
+	dirA := t.TempDir()
+	dirB := t.TempDir()
+
+	conn, cleanup := startTestServer(t)
+	defer cleanup()
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+
+	writeJSON(t, conn, map[string]any{
+		"id":     "1",
+		"method": "openWorkspace",
+		"params": map[string]any{"roots": []string{dirA, dirB}},
+	})
+	openResp := readResponse[struct {
+		WorkspaceID string           `json:"workspaceId"`
+		Status      workspace.Status `json:"status"`
+	}](t, reader)
+	if !openResp.OK {
+		t.Fatalf("openWorkspace failed: %+v", openResp.Error)
+	}
+	wsID := openResp.Result.WorkspaceID
+
+	waitForReadySocket(t, conn, reader, wsID)
+
+	writeJSON(t, conn, map[string]any{
+		"id":     "2",
+		"method": "removeRoot",
+		"params": map[string]any{"workspaceId": wsID, "rootId": "root_1"},
+	})
+	rmResp := readResponse[struct {
+		Roots []workspace.Root `json:"roots"`
+	}](t, reader)
+	if !rmResp.OK {
+		t.Fatalf("removeRoot failed: %+v", rmResp.Error)
+	}
+	if len(rmResp.Result.Roots) != 1 || rmResp.Result.Roots[0].ID != "root_2" {
+		t.Fatalf("expected only root_2 after removeRoot, got %+v", rmResp.Result.Roots)
+	}
+}
+
+func TestAddRootsRPCUnknownWorkspaceReturnsNotFound(t *testing.T) {
+	dir := t.TempDir()
+
+	conn, cleanup := startTestServer(t)
+	defer cleanup()
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+
+	writeJSON(t, conn, map[string]any{
+		"id":     "1",
+		"method": "addRoots",
+		"params": map[string]any{"workspaceId": "ws_does_not_exist", "roots": []string{dir}},
+	})
+	resp := readResponse[struct{}](t, reader)
+	if resp.OK {
+		t.Fatalf("expected addRoots to fail for unknown workspace, got OK")
+	}
+	if resp.Error == nil || resp.Error.Code != "not_found" {
+		t.Fatalf("expected error code not_found, got %+v", resp.Error)
+	}
+}
+
+// waitForReadySocket polls listTree over the socket until status == "ready".
+func waitForReadySocket(t *testing.T, conn net.Conn, reader *bufio.Reader, wsID string) {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		writeJSON(t, conn, map[string]any{
+			"id":     "poll",
+			"method": "listTree",
+			"params": map[string]any{"workspaceId": wsID},
+		})
+		resp := readResponse[struct {
+			Status workspace.Status `json:"status"`
+		}](t, reader)
+		if !resp.OK {
+			t.Fatalf("listTree (poll) failed: %+v", resp.Error)
+		}
+		if resp.Result.Status == workspace.StatusReady {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("workspace %s did not become ready within 2s", wsID)
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+}
+
 func TestServerOpensWorkspaceAndListsTree(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "service")
 	if err := os.MkdirAll(filepath.Join(root, "cmd"), 0o755); err != nil {
