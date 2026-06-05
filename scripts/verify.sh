@@ -62,10 +62,31 @@ check_tool "swift" "Install Xcode or Swift toolchain before macOS app work."
 check_tool "xcodebuild" "Install Xcode before macOS app build verification."
 check_tool "rg" "Install ripgrep or provide bundled rg before search work."
 
+section "Core"
+if command -v go >/dev/null 2>&1; then
+  if (cd "$ROOT_DIR" && go test ./core/...); then
+    printf 'OK      go test ./core/...\n'
+  else
+    printf 'FAILED  go test ./core/...\n'
+    missing=1
+  fi
+
+  build_dir="$(mktemp -d)"
+  trap 'rm -rf "$build_dir"' EXIT
+  if (cd "$ROOT_DIR" && go build -o "$build_dir/archsight-core" ./core/cmd/archsight-core); then
+    printf 'OK      go build ./core/cmd/archsight-core\n'
+  else
+    printf 'FAILED  go build ./core/cmd/archsight-core\n'
+    missing=1
+  fi
+else
+  printf 'SKIP    core tests/build because go is missing\n'
+fi
+
 if [[ "$missing" -eq 0 ]]; then
-  printf '\nPhase 0 verification passed.\n'
+  printf '\nVerification passed.\n'
   exit 0
 fi
 
-printf '\nPhase 0 verification completed with missing prerequisites listed above.\n'
+printf '\nVerification completed with failures or missing prerequisites listed above.\n'
 exit 1

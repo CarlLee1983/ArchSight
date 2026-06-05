@@ -4,6 +4,8 @@
 
 The macOS app and core communicate over a local Unix Domain Socket. The transport is local-only and should not bind TCP ports.
 
+Messages are newline-delimited JSON so the client and core can frame streaming events and responses without a heavyweight protocol dependency.
+
 ## Message Shape
 
 All messages use request IDs so calls can be matched, streamed, and cancelled.
