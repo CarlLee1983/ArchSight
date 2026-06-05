@@ -15,6 +15,7 @@ struct WorkspaceCommandActions {
     var goForward: () -> Void = {}
     var nextTab: () -> Void = {}
     var previousTab: () -> Void = {}
+    var showShortcuts: () -> Void = {}
 }
 
 struct WorkspaceCommandsKey: FocusedValueKey {
@@ -76,6 +77,12 @@ struct WorkspaceMenuCommands: Commands {
                 Button("Go to Tab \(number)") { actions?.selectTab(number) }
                     .keyboardShortcut(KeyEquivalent(Character("\(number)")), modifiers: .command)
             }
+        }
+
+        CommandGroup(after: .help) {
+            Button("Keyboard Shortcuts") { actions?.showShortcuts() }
+                .keyboardShortcut("/", modifiers: .command)
+                .disabled(actions == nil)
         }
     }
 }
