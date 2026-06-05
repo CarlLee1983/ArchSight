@@ -30,6 +30,9 @@ public enum SyntaxHighlighting {
         }
         // 1-based (line, column) -> UTF-16 offset, clamped to the line end (the
         // position of the line's newline, or end of text) and to text bounds.
+        // This deliberately mirrors TextPosition.utf16Offset's clamp semantics;
+        // it is inlined here (rather than calling it per token) so the line
+        // structure is scanned once instead of once per token.
         func offset(line: Int, column: Int) -> Int {
             guard line >= 1, line <= lineStarts.count else { return units.count }
             let base = lineStarts[line - 1]
