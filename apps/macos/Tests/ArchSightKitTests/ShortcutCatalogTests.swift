@@ -14,4 +14,37 @@ final class ShortcutCatalogTests: XCTestCase {
             "⌃⌥⇧⌘K"
         )
     }
+
+    func testCatalogIsNonEmptyAndEveryCategoryHasEntries() {
+        XCTAssertFalse(ShortcutCatalog.all.isEmpty)
+        for category in ShortcutCategory.allCases {
+            XCTAssertTrue(
+                ShortcutCatalog.all.contains { $0.category == category },
+                "category \(category) has no shortcuts"
+            )
+        }
+    }
+
+    func testCatalogIdsAreUnique() {
+        let ids = ShortcutCatalog.all.map(\.id)
+        XCTAssertEqual(ids.count, Set(ids).count, "duplicate shortcut id")
+    }
+
+    func testCatalogChordsAreUnique() {
+        // No two hints should claim the same physical chord (catches double-binding).
+        let chords = ShortcutCatalog.all.map(\.chord)
+        XCTAssertEqual(chords.count, Set(chords.map(\.display)).count, "duplicate chord")
+    }
+
+    func testHintLookupHitAndMiss() {
+        XCTAssertEqual(ShortcutCatalog.hint("quickOpen")?.chord.display, "⌘P")
+        XCTAssertNil(ShortcutCatalog.hint("nope"))
+    }
+
+    func testGroupedCoversAllCategoriesInDeclaredOrder() {
+        let grouped = ShortcutCatalog.grouped()
+        XCTAssertEqual(grouped.map(\.0), ShortcutCategory.allCases)
+        let flattenedCount = grouped.reduce(0) { $0 + $1.1.count }
+        XCTAssertEqual(flattenedCount, ShortcutCatalog.all.count)
+    }
 }
