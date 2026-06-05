@@ -9,9 +9,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/cmg/archsight/core/internal/search"
+	"github.com/cmg/archsight/core/internal/syntax"
 	"github.com/cmg/archsight/core/internal/workspace"
 )
 
@@ -130,6 +132,8 @@ func (s *Server) dispatch(req Request) Response {
 		return s.openWorkspace(req)
 	case "listTree":
 		return s.listTree(req)
+	case "openFile":
+		return s.openFile(req)
 	case "search":
 		return s.search(req)
 	case "cancel":
@@ -175,6 +179,21 @@ type searchResult struct {
 	Matches []search.Match `json:"matches"`
 }
 
+type openFileParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	RootID      string `json:"rootId"`
+	Path        string `json:"path"`
+}
+
+type openFileResult struct {
+	RootID   string         `json:"rootId"`
+	RootPath string         `json:"rootPath"`
+	Path     string         `json:"path"`
+	Language string         `json:"language"`
+	Content  string         `json:"content"`
+	Tokens   []syntax.Token `json:"tokens"`
+}
+
 func (s *Server) openWorkspace(req Request) Response {
 	var params openWorkspaceParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
@@ -206,6 +225,60 @@ func (s *Server) listTree(req Request) Response {
 		Roots:       snapshot.Roots,
 		Entries:     snapshot.Entries,
 		Error:       snapshot.Error,
+	})
+}
+
+func (s *Server) openFile(req Request) Response {
+	var params openFileParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return ErrorResponse(req.ID, NewError("invalid_params", err.Error()))
+	}
+	if params.WorkspaceID == "" || params.RootID == "" || params.Path == "" {
+		return ErrorResponse(req.ID, NewError("invalid_params", "workspaceId, rootId, and path are required"))
+	}
+
+	snapshot, ok := s.workspaces.Get(params.WorkspaceID)
+	if !ok {
+		return ErrorResponse(req.ID, NewError("not_found", "Workspace not found: "+params.WorkspaceID))
+	}
+	if snapshot.Status != workspace.StatusReady {
+		return ErrorResponse(req.ID, NewError("workspace_not_ready", "Workspace is not ready: "+params.WorkspaceID))
+	}
+
+	root, ok := findRoot(snapshot.Roots, params.RootID)
+	if !ok {
+		return ErrorResponse(req.ID, NewError("not_found", "Workspace root not found: "+params.RootID))
+	}
+	fullPath, relPath, err := resolveWorkspaceFile(root.Path, params.Path)
+	if err != nil {
+		return ErrorResponse(req.ID, err)
+	}
+	if !snapshotHasFile(snapshot.Entries, root.ID, relPath) {
+		return ErrorResponse(req.ID, NewError("not_found", "File not found in workspace snapshot: "+relPath))
+	}
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ErrorResponse(req.ID, NewError("not_found", "File not found: "+relPath))
+		}
+		return ErrorResponse(req.ID, err)
+	}
+	if info.IsDir() {
+		return ErrorResponse(req.ID, NewError("invalid_path", "Path is a directory: "+relPath))
+	}
+
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		return ErrorResponse(req.ID, err)
+	}
+	highlight := syntax.Highlight(relPath, string(content))
+	return SuccessResponse(req.ID, openFileResult{
+		RootID:   root.ID,
+		RootPath: root.Path,
+		Path:     relPath,
+		Language: highlight.Language,
+		Content:  string(content),
+		Tokens:   highlight.Tokens,
 	})
 }
 
@@ -266,6 +339,44 @@ func (s *Server) search(req Request) Response {
 		return ErrorResponse(req.ID, err)
 	}
 	return SuccessResponse(req.ID, searchResult{Matches: matches})
+}
+
+func findRoot(roots []workspace.Root, rootID string) (workspace.Root, bool) {
+	for _, root := range roots {
+		if root.ID == rootID {
+			return root, true
+		}
+	}
+	return workspace.Root{}, false
+}
+
+func snapshotHasFile(entries []workspace.Entry, rootID, relPath string) bool {
+	for _, entry := range entries {
+		if entry.RootID == rootID && entry.Path == relPath && entry.Kind == workspace.KindFile {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveWorkspaceFile(rootPath, requestedPath string) (string, string, error) {
+	if filepath.IsAbs(requestedPath) {
+		return "", "", NewError("invalid_path", "Path must be relative to the workspace root")
+	}
+	cleanRel := filepath.Clean(requestedPath)
+	if cleanRel == "." || strings.HasPrefix(cleanRel, ".."+string(filepath.Separator)) || cleanRel == ".." {
+		return "", "", NewError("invalid_path", "Path escapes the workspace root")
+	}
+
+	fullPath := filepath.Join(rootPath, cleanRel)
+	rel, err := filepath.Rel(rootPath, fullPath)
+	if err != nil {
+		return "", "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", "", NewError("invalid_path", "Path escapes the workspace root")
+	}
+	return fullPath, filepath.ToSlash(rel), nil
 }
 
 func (s *Server) trackActive(id string, cancel context.CancelFunc) {

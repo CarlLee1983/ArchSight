@@ -138,6 +138,49 @@ The result shape is ready for streaming even while Phase 3 returns a final aggre
 
 `search` requires a ready workspace. Invalid patterns return `invalid_pattern`. Active searches can be canceled with `cancel` using the search request ID as `targetId`.
 
+## Open File and Syntax Tokens
+
+`openFile` reads a file from a ready workspace snapshot and returns content plus syntax metadata. Paths are always relative to a preserved workspace root identity; absolute paths and `..` traversal are rejected with `invalid_path`. Files must exist as file entries in the current snapshot, so ignored directories such as `.git` remain unavailable through this method.
+
+```json
+{
+  "id": "req_file",
+  "method": "openFile",
+  "params": {
+    "workspaceId": "ws_1",
+    "rootId": "root_1",
+    "path": "cmd/main.go"
+  }
+}
+```
+
+The result is read-only data for the macOS viewer:
+
+```json
+{
+  "id": "req_file",
+  "ok": true,
+  "result": {
+    "rootId": "root_1",
+    "rootPath": "/Users/alex/Code/service-a",
+    "path": "cmd/main.go",
+    "language": "go",
+    "content": "package main\n",
+    "tokens": [
+      {
+        "startLine": 1,
+        "startColumn": 1,
+        "endLine": 1,
+        "endColumn": 8,
+        "type": "keyword"
+      }
+    ]
+  }
+}
+```
+
+During Phase 4, syntax support uses a thin in-process adapter with a stable token schema and initial language detection for Go, Swift, TypeScript, and Markdown. Unsupported languages return plain text with an empty token list. Tree-sitter can replace the adapter without changing the IPC result shape.
+
 ## Streaming
 
 Long-running requests may emit events before a final response:

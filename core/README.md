@@ -31,6 +31,12 @@ Search runs only against roots from a ready workspace snapshot. The command excl
 
 Search cancellation uses request IDs: send `cancel` with the active `search` request ID as `targetId` to cancel the underlying context and terminate `rg`.
 
+## Phase 4 Open File and Syntax Adapter
+
+The core implements `openFile` for ready workspace snapshots. It reads files on demand, rejects absolute paths and `..` traversal, and returns read-only content with preserved root identity.
+
+Syntax metadata currently comes from a small adapter under `core/internal/syntax`. The adapter detects Go, Swift, TypeScript, and Markdown by extension, emits initial keyword tokens for supported code files, and degrades unsupported languages to plain text. It intentionally keeps the IPC token schema stable so Tree-sitter grammars can replace the adapter without changing the macOS client contract.
+
 Run core verification from the repository root:
 
 ```sh
