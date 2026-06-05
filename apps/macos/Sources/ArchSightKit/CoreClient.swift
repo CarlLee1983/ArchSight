@@ -20,6 +20,8 @@ public protocol CoreServicing: AnyObject {
     func listTree(workspaceId: String) throws -> ListTreeResult
     func openFile(workspaceId: String, rootId: String, path: String) throws -> OpenFileResult
     func search(workspaceId: String, pattern: String) throws -> SearchResult
+    func definition(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> NavigationResult
+    func references(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> NavigationResult
 }
 
 public final class CoreClient: CoreHealthChecking, CoreServicing {
@@ -56,6 +58,34 @@ public final class CoreClient: CoreHealthChecking, CoreServicing {
 
     public func search(workspaceId: String, pattern: String) throws -> SearchResult {
         try send(.search, params: SearchParams(workspaceId: workspaceId, pattern: pattern), resultType: SearchResult.self)
+    }
+
+    public func definition(
+        workspaceId: String,
+        rootId: String,
+        path: String,
+        line: Int,
+        column: Int
+    ) throws -> NavigationResult {
+        try send(
+            .definition,
+            params: NavigationParams(workspaceId: workspaceId, rootId: rootId, path: path, line: line, column: column),
+            resultType: NavigationResult.self
+        )
+    }
+
+    public func references(
+        workspaceId: String,
+        rootId: String,
+        path: String,
+        line: Int,
+        column: Int
+    ) throws -> NavigationResult {
+        try send(
+            .references,
+            params: NavigationParams(workspaceId: workspaceId, rootId: rootId, path: path, line: line, column: column),
+            resultType: NavigationResult.self
+        )
     }
 
     private func send<Params: Encodable & Sendable, Result: Decodable>(

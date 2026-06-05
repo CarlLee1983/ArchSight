@@ -138,4 +138,12 @@ private final class FakeCoreClient: CoreServicing {
         searchCalls.append((workspaceId, pattern))
         return searchResult
     }
+
+    func definition(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> NavigationResult {
+        NavigationResult(locations: [])
+    }
+
+    func references(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> NavigationResult {
+        NavigationResult(locations: [])
+    }
 }

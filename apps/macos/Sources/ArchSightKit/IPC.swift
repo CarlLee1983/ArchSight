@@ -71,6 +71,22 @@ public struct SearchParams: Encodable, Equatable, Sendable {
     }
 }
 
+public struct NavigationParams: Encodable, Equatable, Sendable {
+    public let workspaceId: String
+    public let rootId: String
+    public let path: String
+    public let line: Int
+    public let column: Int
+
+    public init(workspaceId: String, rootId: String, path: String, line: Int, column: Int) {
+        self.workspaceId = workspaceId
+        self.rootId = rootId
+        self.path = path
+        self.line = line
+        self.column = column
+    }
+}
+
 public struct IPCResponse<Result: Decodable>: Decodable {
     public let id: String
     public let ok: Bool
@@ -184,4 +200,41 @@ public struct SearchMatch: Decodable, Equatable, Identifiable, Sendable {
 
 public struct SearchResult: Decodable, Equatable, Sendable {
     public let matches: [SearchMatch]
+}
+
+public struct Location: Decodable, Equatable, Identifiable, Sendable {
+    public var id: String { "\(rootId):\(path):\(startLine):\(startColumn)" }
+    public let rootId: String
+    public let rootPath: String
+    public let path: String
+    public let startLine: Int
+    public let startColumn: Int
+    public let endLine: Int
+    public let endColumn: Int
+
+    public init(
+        rootId: String,
+        rootPath: String,
+        path: String,
+        startLine: Int,
+        startColumn: Int,
+        endLine: Int,
+        endColumn: Int
+    ) {
+        self.rootId = rootId
+        self.rootPath = rootPath
+        self.path = path
+        self.startLine = startLine
+        self.startColumn = startColumn
+        self.endLine = endLine
+        self.endColumn = endColumn
+    }
+}
+
+public struct NavigationResult: Decodable, Equatable, Sendable {
+    public let locations: [Location]
+
+    public init(locations: [Location]) {
+        self.locations = locations
+    }
 }

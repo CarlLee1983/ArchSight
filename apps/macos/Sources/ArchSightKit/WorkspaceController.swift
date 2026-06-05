@@ -50,4 +50,14 @@ public final class WorkspaceController {
     public func search(workspaceId: String, pattern: String) throws -> [SearchMatch] {
         try client.search(workspaceId: workspaceId, pattern: pattern).matches
     }
+
+    /// Resolves the definition location(s) for the symbol at the given position.
+    public func definition(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> [Location] {
+        try client.definition(workspaceId: workspaceId, rootId: rootId, path: path, line: line, column: column).locations
+    }
+
+    /// Resolves the reference location(s) for the symbol at the given position.
+    public func references(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> [Location] {
+        try client.references(workspaceId: workspaceId, rootId: rootId, path: path, line: line, column: column).locations
+    }
 }

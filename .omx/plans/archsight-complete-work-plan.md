@@ -269,6 +269,16 @@ Acceptance criteria:
 
 Complete the observation workflow for code review.
 
+Implementation status:
+
+- Added an AppKit-backed read-only `CodeTextView` (NSTextView in NSScrollView) with monospaced rendering, no editing affordances, Cmd+Click to request a definition, and a context menu exposing `Go to Definition` and `Find References` as explicit user actions.
+- Added `CoreClient.definition`/`references` behind `CoreServicing` and `WorkspaceController.definition`/`references` returning `[Location]`, with `Location`/`NavigationResult`/`NavigationParams` IPC models.
+- Added a tested `TextPosition.lineColumn(forUTF16Offset:in:)` helper so AppKit click offsets map to the 1-based line/column the core expects.
+- Added tab management on `WorkspaceViewState` (`closeTab` with neighbor selection, `selectNextTab`/`selectPreviousTab`) and a `NavigationHistory` value type for back/forward with forward-branch truncation.
+- Wired the shell with a split-pane (`HSplitView`) comparison view, per-tab close buttons (no edit affordances), a dismissable references panel that opens and scrolls to each location, keyboard-navigable tree and search lists (arrow keys plus Return to open), and keyboard shortcuts for back/forward (Cmd+[ / Cmd+]), close tab (Cmd+W), and next/previous tab (Cmd+Shift+] / Cmd+Shift+[).
+- Definition jumps and reference selections open the target file read-only and scroll to the symbol; navigation never exposes editing, formatting, refactoring, or diagnostics.
+- Added Swift package tests (52 total) and verified the definition/references request path end-to-end against the real core (correct param parsing, `unsupported_language` without an installed server, `invalid_params` on bad positions, no orphan process); the successful-server path stays covered by the Phase 5 fake-LSP Go tests.
+
 Tasks:
 
 - Add split-pane layout for comparing files.

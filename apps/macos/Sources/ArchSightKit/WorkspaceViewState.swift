@@ -8,6 +8,8 @@ public struct WorkspaceViewState: Equatable, Sendable {
     public var selectedTabID: FileTab.ID?
     public var searchQuery: String
     public var searchResults: [SearchMatch]
+    public var references: [Location]
+    public var referencesContext: String?
     public var isLoading: Bool
     public var errorMessage: String?
 
@@ -23,6 +25,8 @@ public struct WorkspaceViewState: Equatable, Sendable {
         selectedTabID: FileTab.ID? = nil,
         searchQuery: String = "",
         searchResults: [SearchMatch] = [],
+        references: [Location] = [],
+        referencesContext: String? = nil,
         isLoading: Bool = false,
         errorMessage: String? = nil
     ) {
@@ -33,6 +37,8 @@ public struct WorkspaceViewState: Equatable, Sendable {
         self.selectedTabID = selectedTabID
         self.searchQuery = searchQuery
         self.searchResults = searchResults
+        self.references = references
+        self.referencesContext = referencesContext
         self.isLoading = isLoading
         self.errorMessage = errorMessage
         self.allowsEditing = false
@@ -53,6 +59,49 @@ public struct WorkspaceViewState: Equatable, Sendable {
             openTabs.append(tab)
         }
         selectedTabID = tab.id
+    }
+
+    /// Closes a tab; when the closed tab was selected, selection falls to the
+    /// next neighbor, then the previous one, then clears.
+    public mutating func closeTab(id: FileTab.ID) {
+        guard let index = openTabs.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        let wasSelected = selectedTabID == id
+        openTabs.remove(at: index)
+        guard wasSelected else {
+            return
+        }
+        if openTabs.isEmpty {
+            selectedTabID = nil
+        } else {
+            let neighbor = min(index, openTabs.count - 1)
+            selectedTabID = openTabs[neighbor].id
+        }
+    }
+
+    public mutating func selectNextTab() {
+        moveSelection(by: 1)
+    }
+
+    public mutating func selectPreviousTab() {
+        moveSelection(by: -1)
+    }
+
+    private mutating func moveSelection(by step: Int) {
+        guard !openTabs.isEmpty else {
+            selectedTabID = nil
+            return
+        }
+        guard let current = selectedTabID,
+              let index = openTabs.firstIndex(where: { $0.id == current })
+        else {
+            selectedTabID = openTabs.first?.id
+            return
+        }
+        let count = openTabs.count
+        let next = ((index + step) % count + count) % count
+        selectedTabID = openTabs[next].id
     }
 }
 
