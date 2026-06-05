@@ -48,7 +48,7 @@
 - Modify: `core/internal/workspace/manager.go`
 - Test: `core/internal/workspace/manager_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 在 `core/internal/workspace/manager_test.go` 末端新增：
 ```go
@@ -70,12 +70,12 @@ func TestOpenAssignsSequentialRootIDsFromOne(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails or passes**
+- [x] **Step 2: Run test to verify it fails or passes**
 
 Run（在 `core`）：`go test ./internal/workspace/ -run TestOpenAssignsSequentialRootIDsFromOne -v`
 Expected: PASS（現有 `buildRoots` 已產生 `root_1`/`root_2`）。此測試先鎖住既有行為，後續重構不可破壞它。
 
-- [ ] **Step 3: 重構為單調計數器**
+- [x] **Step 3: 重構為單調計數器**
 
 在 `core/internal/workspace/manager.go`：
 
@@ -165,17 +165,17 @@ func cloneSnapshot(snapshot *Snapshot) Snapshot {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run（在 `core`）：`go test ./internal/workspace/ -run TestOpenAssignsSequentialRootIDsFromOne -v`
 Expected: PASS。
 
-- [ ] **Step 5: 全 workspace 套件確認無回歸**
+- [x] **Step 5: 全 workspace 套件確認無回歸**
 
 Run（在 `core`）：`go test ./internal/workspace/`
 Expected: PASS。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add core/internal/workspace/manager.go core/internal/workspace/manager_test.go
@@ -190,7 +190,7 @@ git commit -m "refactor: [core] assign monotonic stable workspace root ids"
 - Modify: `core/internal/workspace/manager.go`
 - Test: `core/internal/workspace/manager_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 在 `manager_test.go` 末端新增（沿用既有 `waitForSnapshot` helper）：
 ```go
@@ -243,12 +243,12 @@ func TestAddRootsUnknownWorkspaceErrors(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run（在 `core`）：`go test ./internal/workspace/ -run TestAddRoots -v`
 Expected: FAIL（`manager.AddRoots undefined`）。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 在 `core/internal/workspace/manager.go` 新增（放在 `Open` 之後）：
 ```go
@@ -319,12 +319,12 @@ func (m *Manager) finishAppend(id string, err error, newEntries []Entry) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run（在 `core`）：`go test ./internal/workspace/ -run TestAddRoots -v`
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add core/internal/workspace/manager.go core/internal/workspace/manager_test.go
@@ -339,7 +339,7 @@ git commit -m "feat: [core] add incremental AddRoots scanning to workspace manag
 - Modify: `core/internal/workspace/manager.go`
 - Test: `core/internal/workspace/manager_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 在 `manager_test.go` 末端新增：
 ```go
@@ -384,12 +384,12 @@ func TestRemoveRootUnknownErrors(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run（在 `core`）：`go test ./internal/workspace/ -run TestRemoveRoot -v`
 Expected: FAIL（`manager.RemoveRoot undefined`）。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 在 `core/internal/workspace/manager.go` 新增：
 ```go
@@ -431,17 +431,17 @@ func (m *Manager) RemoveRoot(id, rootID string) (Snapshot, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run（在 `core`）：`go test ./internal/workspace/ -run TestRemoveRoot -v`
 Expected: PASS。
 
-- [ ] **Step 5: 全套件確認無回歸**
+- [x] **Step 5: 全套件確認無回歸**
 
 Run（在 `core`）：`go test ./internal/workspace/`
 Expected: PASS。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add core/internal/workspace/manager.go core/internal/workspace/manager_test.go
@@ -458,7 +458,7 @@ git commit -m "feat: [core] add RemoveRoot to drop a root and its entries"
 - Modify: `core/internal/ipc/server.go`
 - Test: `core/internal/ipc/workspace_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 先看既有 `core/internal/ipc/workspace_test.go` 的 helper（如何建 server、發 request、解 response），沿用同款 helper 新增：
 ```go
@@ -511,12 +511,12 @@ func TestRemoveRootRPCDropsRoot(t *testing.T) {
 ```
 > 註：`mustRequest`、`decodeWorkspaceID`、`decodeListTree`、`waitForReadyRPC` 若 `workspace_test.go` 尚無，請依該檔既有測試的解碼方式新增小 helper（`mustRequest` 把 params marshal 成 `json.RawMessage` 後組 `Request`；`decodeListTree` 把 `resp.Result` 重新 marshal+unmarshal 成 `listTreeResult`；`waitForReadyRPC` 反覆 dispatch `listTree` 直到 `status == "ready"`，上限約 200 次）。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run（在 `core`）：`go test ./internal/ipc/ -run 'TestAddRootsRPC|TestRemoveRootRPC' -v`
 Expected: FAIL（`Unsupported method: addRoots`）。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 在 `core/internal/ipc/server.go`：
 
@@ -592,17 +592,17 @@ func (s *Server) removeRoot(req Request) Response {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run（在 `core`）：`go test ./internal/ipc/ -run 'TestAddRootsRPC|TestRemoveRootRPC' -v`
 Expected: PASS。
 
-- [ ] **Step 5: 全 core 測試確認無回歸**
+- [x] **Step 5: 全 core 測試確認無回歸**
 
 Run（在 `core`）：`go test ./...`
 Expected: PASS。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add core/internal/ipc/server.go core/internal/ipc/workspace_test.go
@@ -618,7 +618,7 @@ git commit -m "feat: [core] add addRoots and removeRoot IPC handlers"
 **Files:**
 - Modify: `apps/macos/Sources/ArchSightKit/IPC.swift`
 
-- [ ] **Step 1: 新增 IPCMethod case 與 params**
+- [x] **Step 1: 新增 IPCMethod case 與 params**
 
 在 `apps/macos/Sources/ArchSightKit/IPC.swift`：
 
@@ -661,12 +661,12 @@ public struct RemoveRootParams: Encodable, Equatable, Sendable {
 }
 ```
 
-- [ ] **Step 2: Build 驗證**
+- [x] **Step 2: Build 驗證**
 
 Run（在 `apps/macos`）：`swift build`
 Expected: 編譯成功（型別新增、尚無使用）。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/macos/Sources/ArchSightKit/IPC.swift
@@ -682,7 +682,7 @@ git commit -m "feat: [macos] add addRoots/removeRoot IPC method and params"
 - Modify: `apps/macos/Tests/ArchSightKitTests/WorkspaceControllerTests.swift`（`FakeCoreClient`）
 - Modify: `apps/macos/Tests/ArchSightKitTests/NavigationTests.swift`（`StubServicing`）
 
-- [ ] **Step 1: 擴充協定與實作**
+- [x] **Step 1: 擴充協定與實作**
 
 在 `apps/macos/Sources/ArchSightKit/CoreClient.swift`：
 
@@ -719,7 +719,7 @@ public protocol CoreServicing: AnyObject {
     }
 ```
 
-- [ ] **Step 2: 更新 `FakeCoreClient`（WorkspaceControllerTests）**
+- [x] **Step 2: 更新 `FakeCoreClient`（WorkspaceControllerTests）**
 
 在 `apps/macos/Tests/ArchSightKitTests/WorkspaceControllerTests.swift` 的 `FakeCoreClient` 內，新增可記錄呼叫的屬性與方法：
 ```swift
@@ -739,7 +739,7 @@ public protocol CoreServicing: AnyObject {
     }
 ```
 
-- [ ] **Step 3: 更新 `StubServicing`（NavigationTests）**
+- [x] **Step 3: 更新 `StubServicing`（NavigationTests）**
 
 在 `apps/macos/Tests/ArchSightKitTests/NavigationTests.swift` 的 `StubServicing` 內新增（僅供編譯，回傳最小值）：
 ```swift
@@ -753,12 +753,12 @@ public protocol CoreServicing: AnyObject {
 ```
 > 若 `NavigationTests` 的 stub 名稱/內容不同，依該檔實際 stub 補齊這兩個方法即可。執行 Step 4 的 build 會明確指出所有未實作協定的型別。
 
-- [ ] **Step 4: Build 測試 target 驗證**
+- [x] **Step 4: Build 測試 target 驗證**
 
 Run（在 `apps/macos`）：`swift build --build-tests`
 Expected: 編譯成功（所有 `CoreServicing` 實作都補齊）。若有其它檔案實作 `CoreServicing` 未補方法，編譯錯誤會列出，逐一補上同樣兩方法。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/macos/Sources/ArchSightKit/CoreClient.swift apps/macos/Tests/ArchSightKitTests/WorkspaceControllerTests.swift apps/macos/Tests/ArchSightKitTests/NavigationTests.swift
@@ -773,7 +773,7 @@ git commit -m "feat: [macos] add addRoots/removeRoot to CoreServicing and fakes"
 - Modify: `apps/macos/Sources/ArchSightKit/WorkspaceController.swift`
 - Test: `apps/macos/Tests/ArchSightKitTests/WorkspaceControllerTests.swift`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 在 `WorkspaceControllerTests` 內新增：
 ```swift
@@ -812,12 +812,12 @@ git commit -m "feat: [macos] add addRoots/removeRoot to CoreServicing and fakes"
     }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run（在 `apps/macos`）：`swift test --filter WorkspaceControllerTests`
 Expected: FAIL（`addRoots`/`removeRoot` 不存在於 controller）。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 在 `apps/macos/Sources/ArchSightKit/WorkspaceController.swift`：
 
@@ -860,12 +860,12 @@ Expected: FAIL（`addRoots`/`removeRoot` 不存在於 controller）。
 ```
 > 移除舊 `openWorkspace` 內重複的 for-loop 主體（已搬進 `awaitReady`）。
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run（在 `apps/macos`）：`swift test --filter WorkspaceControllerTests`
 Expected: PASS（含既有四個 openWorkspace 測試維持綠燈）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/macos/Sources/ArchSightKit/WorkspaceController.swift apps/macos/Tests/ArchSightKitTests/WorkspaceControllerTests.swift
@@ -880,7 +880,7 @@ git commit -m "feat: [macos] add WorkspaceController addRoots/removeRoot with sh
 - Modify: `apps/macos/Sources/ArchSightKit/WorkspaceViewState.swift`
 - Test: `apps/macos/Tests/ArchSightKitTests/AppStateTests.swift`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 在 `apps/macos/Tests/ArchSightKitTests/AppStateTests.swift` 新增（若該檔已有 `WorkspaceViewState` 測試，沿用同檔；否則新增測試類別）：
 ```swift
@@ -940,12 +940,12 @@ git commit -m "feat: [macos] add WorkspaceController addRoots/removeRoot with sh
 ```
 > 若 `AppStateTests` 尚未 `import` / `@testable import ArchSightKit`，比照同檔其他測試補上。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run（在 `apps/macos`）：`swift test --filter AppStateTests`
 Expected: FAIL（`removeRoot`/`closeWorkspace` 不存在）。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 在 `apps/macos/Sources/ArchSightKit/WorkspaceViewState.swift` 的 `WorkspaceViewState` 內新增（放在 `closeTab` 之後）：
 ```swift
@@ -976,12 +976,12 @@ Expected: FAIL（`removeRoot`/`closeWorkspace` 不存在）。
     }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run（在 `apps/macos`）：`swift test --filter AppStateTests`
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/macos/Sources/ArchSightKit/WorkspaceViewState.swift apps/macos/Tests/ArchSightKitTests/AppStateTests.swift
@@ -998,7 +998,7 @@ git commit -m "feat: [macos] add WorkspaceViewState removeRoot/closeWorkspace"
 - Create: `apps/macos/Sources/ArchSightApp/AppCore.swift`
 - Modify: `apps/macos/Sources/ArchSightApp/ArchSightApp.swift`
 
-- [ ] **Step 1: 建立 AppCore**
+- [x] **Step 1: 建立 AppCore**
 
 `apps/macos/Sources/ArchSightApp/AppCore.swift`:
 ```swift
@@ -1035,7 +1035,7 @@ final class AppCore {
 }
 ```
 
-- [ ] **Step 2: App 注入 AppCore 並恢復 New Window**
+- [x] **Step 2: App 注入 AppCore 並恢復 New Window**
 
 `apps/macos/Sources/ArchSightApp/ArchSightApp.swift`:
 ```swift
@@ -1064,12 +1064,12 @@ struct ArchSightApp: App {
 ```
 > 關鍵：移除原本的 `.commands { CommandGroup(replacing: .newItem) {} }`。`WindowGroup` 預設即提供 File ▸ New Window（`Cmd+N`），刪除這個空替換就能開多視窗。Plan B 之後加入的 `.commands` 不會替換 `.newItem`，故 New Window 持續存在。
 
-- [ ] **Step 3: Build 驗證**
+- [x] **Step 3: Build 驗證**
 
 Run（在 `apps/macos`）：`swift build`
 Expected: 編譯失敗，錯誤集中在 `ContentView` 仍引用已不存在的 `coreSession`/`coreEndpoint`/`coreStatus`。下一個 Task 修正。
 
-- [ ] **Step 4: Commit（先存 AppCore 與 App）**
+- [x] **Step 4: Commit（先存 AppCore 與 App）**
 
 > 為維持可編譯的提交邊界，本 Task 與 Task 10 的改動一起編譯通過後再 commit。先不 commit，直接進 Task 10。
 
@@ -1080,7 +1080,7 @@ Expected: 編譯失敗，錯誤集中在 `ContentView` 仍引用已不存在的 
 **Files:**
 - Modify: `apps/macos/Sources/ArchSightApp/ContentView.swift`
 
-- [ ] **Step 1: 改用共用 AppCore**
+- [x] **Step 1: 改用共用 AppCore**
 
 在 `apps/macos/Sources/ArchSightApp/ContentView.swift`：
 
@@ -1104,7 +1104,7 @@ Expected: 編譯失敗，錯誤集中在 `ContentView` 仍引用已不存在的 
 
 (d) `statusBar` 內的 `switch coreStatus` 改為 `switch appCore.status`。
 
-- [ ] **Step 2: 加入/首開資料夾改走增量**
+- [x] **Step 2: 加入/首開資料夾改走增量**
 
 把 `appendRoots(_:)` 改為：首開用 `openWorkspace`，已有 workspace 用 `addRoots`：
 ```swift
@@ -1149,7 +1149,7 @@ Expected: 編譯失敗，錯誤集中在 `ContentView` 仍引用已不存在的 
     }
 ```
 
-- [ ] **Step 3: 新增移除/關閉資料夾動作**
+- [x] **Step 3: 新增移除/關閉資料夾動作**
 
 在 `addRoots` 之後新增：
 ```swift
@@ -1181,7 +1181,7 @@ Expected: 編譯失敗，錯誤集中在 `ContentView` 仍引用已不存在的 
     }
 ```
 
-- [ ] **Step 4: 側邊欄 root Section 加右鍵選單**
+- [x] **Step 4: 側邊欄 root Section 加右鍵選單**
 
 在 `sidebarPanel` 的 explorer 分支，`Section(root.name) { ... }` 後加 `.contextMenu`。把：
 ```swift
@@ -1223,18 +1223,18 @@ Expected: 編譯失敗，錯誤集中在 `ContentView` 仍引用已不存在的 
                     }
 ```
 
-- [ ] **Step 5: Build 驗證**
+- [x] **Step 5: Build 驗證**
 
 Run（在 `apps/macos`）：`swift build`
 Expected: 編譯成功（Task 9 + Task 10 一起綠燈）。
 若仍有 `coreStatus`/`coreSession`/`connectCoreIfConfigured` 殘留引用，依錯誤逐一移除。
 
-- [ ] **Step 6: 全測試確認無回歸**
+- [x] **Step 6: 全測試確認無回歸**
 
 Run（在 `apps/macos`）：`swift test`
 Expected: PASS。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/macos/Sources/ArchSightApp/AppCore.swift apps/macos/Sources/ArchSightApp/ArchSightApp.swift apps/macos/Sources/ArchSightApp/ContentView.swift
@@ -1247,7 +1247,12 @@ git commit -m "feat: [macos] share one core across windows and add incremental f
 
 **Files:** 無（驗證）
 
-- [ ] **Step 1: 啟動並驗證多視窗共用單一 core**
+> **驗證紀錄（2026-06-05）：** 自動化部分全綠 — `go test ./...`、`swift build`、`swift test`（109 tests, 0 失敗）。
+> 「單一 core」不變量以行程父子關係直接證實：執行中 App 的子行程恰為 1 個 core（其餘為過去 SIGKILL 殘留、PPID=1 的孤兒，已清理）。
+> Step 1–2 的互動式 GUI 點擊步驟（Cmd+N 第二視窗、Cmd+O 兩資料夾、右鍵 Remove/Close Folder、增量無閃爍）依使用者決定**略過**（原生 macOS UI 互動無法可靠自動化）。
+> 旁註：App 被 SIGKILL 時 core 不會自我終止 → 孤兒累積，屬健壯性缺口，超出 Plan A 範圍，留作後續（見記憶 `core-orphan-on-sigkill`）。
+
+- [x] **Step 1: 啟動並驗證多視窗共用單一 core**
 
 Run（在 `apps/macos`）：`swift run ArchSight`
 逐項確認：
@@ -1255,7 +1260,7 @@ Run（在 `apps/macos`）：`swift run ArchSight`
 2. 兩個視窗各自 `Cmd+O` 開不同資料夾，互不干擾（各自 roots/tabs）。
 3. 另開終端機：`pgrep -fl archsight-core | wc -l` → 應只有 **1** 個 core 行程。
 
-- [ ] **Step 2: 驗證多資料夾增量 + 移除/關閉**
+- [x] **Step 2: 驗證多資料夾增量 + 移除/關閉**
 
 1. 開資料夾 A，開一個檔成分頁。
 2. 再拖入/`Cmd+O` 資料夾 B：A 的分頁、選取、展開狀態不變，側邊欄新增 B 區段（無整包閃爍）。
@@ -1263,7 +1268,7 @@ Run（在 `apps/macos`）：`swift run ArchSight`
 4. 右鍵任一區段 → Close Folder：回到 No Workspace 空狀態；再開資料夾仍正常。
 5. 開檔後 `Go to Definition` / `Find References` / 搜尋仍正常（workspaceId 與 root id 對應未壞）。
 
-- [ ] **Step 3: 收尾**
+- [x] **Step 3: 收尾**
 
 若全部通過，Plan A 完成。Run（在 `core`）`go test ./...` 與（在 `apps/macos`）`swift test` 最後各跑一次確認綠燈。
 

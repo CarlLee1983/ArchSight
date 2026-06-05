@@ -59,7 +59,7 @@
 - Create: `apps/macos/Sources/ArchSightKit/FuzzyMatch.swift`
 - Test: `apps/macos/Tests/ArchSightKitTests/FuzzyMatchTests.swift`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/macos/Tests/ArchSightKitTests/FuzzyMatchTests.swift`:
 ```swift
@@ -103,12 +103,12 @@ final class FuzzyMatchTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `swift test --filter FuzzyMatchTests`
 Expected: FAIL（`cannot find 'FuzzyMatch' in scope`）。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `apps/macos/Sources/ArchSightKit/FuzzyMatch.swift`:
 ```swift
@@ -182,12 +182,12 @@ public enum FuzzyMatch {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `swift test --filter FuzzyMatchTests`
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/macos/Sources/ArchSightKit/FuzzyMatch.swift apps/macos/Tests/ArchSightKitTests/FuzzyMatchTests.swift
@@ -204,7 +204,7 @@ git commit -m "feat: [macos] add FuzzyMatch subsequence matcher for quick open"
 - Create: `apps/macos/Sources/ArchSightApp/QuickOpenPanel.swift`
 - Modify: `apps/macos/Sources/ArchSightApp/ContentView.swift`
 
-- [ ] **Step 1: 建立 QuickOpenPanel**
+- [x] **Step 1: 建立 QuickOpenPanel**
 
 `apps/macos/Sources/ArchSightApp/QuickOpenPanel.swift`:
 ```swift
@@ -301,7 +301,7 @@ struct QuickOpenPanel: View {
 }
 ```
 
-- [ ] **Step 2: 在 ContentView 加狀態與 overlay**
+- [x] **Step 2: 在 ContentView 加狀態與 overlay**
 
 在 `apps/macos/Sources/ArchSightApp/ContentView.swift`：
 
@@ -332,12 +332,12 @@ struct QuickOpenPanel: View {
         }
 ```
 
-- [ ] **Step 3: Build 驗證**
+- [x] **Step 3: Build 驗證**
 
 Run: `swift build`
 Expected: 編譯成功。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/macos/Sources/ArchSightApp/QuickOpenPanel.swift apps/macos/Sources/ArchSightApp/ContentView.swift
@@ -357,7 +357,7 @@ git commit -m "feat: [macos] add Quick Open overlay panel"
 - Modify: `apps/macos/Sources/ArchSightApp/ArchSightApp.swift`
 - Modify: `apps/macos/Sources/ArchSightApp/ContentView.swift`
 
-- [ ] **Step 1: 建立指令型別與選單**
+- [x] **Step 1: 建立指令型別與選單**
 
 `apps/macos/Sources/ArchSightApp/WorkspaceCommands.swift`:
 ```swift
@@ -444,7 +444,7 @@ struct WorkspaceMenuCommands: Commands {
 }
 ```
 
-- [ ] **Step 2: App 掛上 .commands**
+- [x] **Step 2: App 掛上 .commands**
 
 在 `apps/macos/Sources/ArchSightApp/ArchSightApp.swift` 的 `WindowGroup { ... }` 之後（`Settings` 之前）加：
 ```swift
@@ -454,7 +454,7 @@ struct WorkspaceMenuCommands: Commands {
 ```
 > 不替換 `.newItem`，故 Plan A 恢復的 New Window（`Cmd+N`）持續有效；`Open Folder…` 以 `after: .newItem` 緊接其後。
 
-- [ ] **Step 3: ContentView 暴露 focusedValue 並加 helper**
+- [x] **Step 3: ContentView 暴露 focusedValue 並加 helper**
 
 在 `apps/macos/Sources/ArchSightApp/ContentView.swift`：
 
@@ -505,7 +505,7 @@ import AppKit
     }
 ```
 
-- [ ] **Step 4: 精簡隱形按鈕——只保留 Cmd+W**
+- [x] **Step 4: 精簡隱形按鈕——只保留 Cmd+W**
 
 把 `ContentView` 既有的 `keyboardShortcuts`（含 back/forward/closeTab/next/prev 五個隱形按鈕）整段替換為僅 `Cmd+W`：
 ```swift
@@ -520,17 +520,17 @@ import AppKit
 ```
 > `.background { keyboardShortcuts }` 維持不變。back/forward/next/prev 改由 Task 3 的「Go」選單提供，避免雙重綁定。
 
-- [ ] **Step 5: Build 驗證**
+- [x] **Step 5: Build 驗證**
 
 Run: `swift build`
 Expected: 編譯成功。
 
-- [ ] **Step 6: 全測試確認無回歸**
+- [x] **Step 6: 全測試確認無回歸**
 
 Run: `swift test`
 Expected: PASS。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/macos/Sources/ArchSightApp/WorkspaceCommands.swift apps/macos/Sources/ArchSightApp/ArchSightApp.swift apps/macos/Sources/ArchSightApp/ContentView.swift
@@ -546,7 +546,7 @@ git commit -m "feat: [macos] route VSCode-style shortcuts via Commands and Focus
 **Files:**
 - Modify: `apps/macos/Sources/ArchSightApp/CodeTextView.swift`
 
-- [ ] **Step 1: makeNSView 啟用 find bar**
+- [x] **Step 1: makeNSView 啟用 find bar**
 
 在 `apps/macos/Sources/ArchSightApp/CodeTextView.swift` 的 `makeNSView(context:)` 內，於 `textView.coordinator = context.coordinator` 之前加：
 ```swift
@@ -555,12 +555,12 @@ git commit -m "feat: [macos] route VSCode-style shortcuts via Commands and Focus
 ```
 > `NSTextView` 為 selectable（即使 read-only）即可成為 first responder，系統 Edit ▸ Find ▸ Find…（`Cmd+F`）會經 responder chain 觸發 `performTextFinderAction(_:)`，因 `usesFindBar = true` 而顯示原生尋找列，支援下一個/上一個。Edit 選單為 SwiftUI 預設提供、未被替換。
 
-- [ ] **Step 2: Build 驗證**
+- [x] **Step 2: Build 驗證**
 
 Run: `swift build`
 Expected: 編譯成功。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/macos/Sources/ArchSightApp/CodeTextView.swift
@@ -575,11 +575,16 @@ git commit -m "feat: [macos] enable native find bar in the code view"
 
 **Files:** 無（驗證）
 
-- [ ] **Step 1: 啟動**
+> **驗證紀錄（2026-06-06）：** 自動化部分全綠 — `swift test`（115 tests, 0 失敗，含新增 6 個 FuzzyMatch）、`swift build` 成功。
+> 冒煙測試：`swift run ArchSight` 正常啟動並存活（Commands / `@FocusedValue` / Quick Open overlay 執行期無崩潰），SIGTERM 乾淨終止、core 未洩漏成孤兒。
+> 快捷鍵配置經程式碼自審無衝突（`Cmd+F` 原生 find vs `Cmd+Shift+F` focus Search；`Cmd+[`/`]` 上下頁 vs `Cmd+Shift+[`/`]` 切分頁；`Cmd+1~9`、`Cmd+=`/`-`、`Cmd+W`、`Cmd+P`、`Cmd+O`、`Cmd+B`、`Cmd+\` 各自獨立）。
+> Step 2 的互動式逐項點擊驗證（實際按每個快捷鍵觀察行為）依使用者決定**略過**（原生 macOS 鍵盤互動無法可靠自動化）。
+
+- [x] **Step 1: 啟動**
 
 Run: `swift run ArchSight`，開一個資料夾、開數個檔成分頁。
 
-- [ ] **Step 2: 逐項過快捷鍵**
+- [x] **Step 2: 逐項過快捷鍵**
 
 1. `Cmd+O` 開資料夾；`Cmd+N` 開新視窗。
 2. `Cmd+B` 切側邊欄；`Cmd+Shift+E` / `Cmd+Shift+F` 切 Explorer/Search 分頁並顯示側邊欄。
@@ -592,7 +597,7 @@ Run: `swift run ArchSight`，開一個資料夾、開數個檔成分頁。
 9. `Cmd+W`：有分頁→關當前分頁；關到沒有分頁後再 `Cmd+W`→關閉視窗。
 10. 多視窗下，快捷鍵都作用在當前作用中（key）視窗。
 
-- [ ] **Step 3: 收尾**
+- [x] **Step 3: 收尾**
 
 Run: `swift test` 與 `swift build` 各一次確認綠燈。Plan B 完成。
 
