@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var coreStatus: CoreSessionStatus = .disconnected
     @State private var coreSession = CoreSessionFactory.fromEnvironment()
     @State private var coreEndpoint: CoreServiceEndpoint?
+    @State private var expandedPaths: Set<String> = []
 
     @State private var history = NavigationHistory()
     @State private var isSplit = false
@@ -266,13 +267,28 @@ struct ContentView: View {
 
     private func sidebarNode(_ node: WorkspaceTreeNode) -> AnyView {
         if node.isDirectory {
-            return AnyView(DisclosureGroup {
+            let isExpandedBinding = Binding<Bool>(
+                get: { expandedPaths.contains(node.path) },
+                set: { isExpanded in
+                    if isExpanded {
+                        expandedPaths.insert(node.path)
+                    } else {
+                        expandedPaths.remove(node.path)
+                    }
+                }
+            )
+            let isExpanded = expandedPaths.contains(node.path)
+            return AnyView(DisclosureGroup(isExpanded: isExpandedBinding) {
                 ForEach(node.children) { child in
                     sidebarNode(child)
                 }
             } label: {
                 HStack(spacing: 6) {
-                    ArchSightIcon.Folder()
+                    if isExpanded {
+                        ArchSightIcon.FolderOpen()
+                    } else {
+                        ArchSightIcon.Folder()
+                    }
                     Text(node.name)
                         .font(.system(.caption, design: .default))
                 }
