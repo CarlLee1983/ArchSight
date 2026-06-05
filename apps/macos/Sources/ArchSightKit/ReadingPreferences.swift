@@ -39,3 +39,54 @@ public enum LineSpacing: String, CaseIterable, Codable, Sendable {
         }
     }
 }
+
+public struct ReadingPreferences: Equatable, Sendable, Codable {
+    public var theme: ReadingThemeID
+    public var fontScale: Double
+    public var lineSpacing: LineSpacing
+
+    public init(theme: ReadingThemeID, fontScale: Double, lineSpacing: LineSpacing) {
+        self.theme = theme
+        self.fontScale = fontScale
+        self.lineSpacing = lineSpacing
+    }
+
+    public static let `default` = ReadingPreferences(theme: .system, fontScale: 1.0, lineSpacing: .normal)
+
+    /// Discrete font scale steps used by the A- / A+ controls.
+    public static let fontScaleSteps: [Double] = [0.85, 1.0, 1.15, 1.3, 1.5]
+
+    public func increasedFont() -> ReadingPreferences {
+        steppedFont(by: 1)
+    }
+
+    public func decreasedFont() -> ReadingPreferences {
+        steppedFont(by: -1)
+    }
+
+    /// Snaps `fontScale` to the nearest valid step (used after decoding untrusted storage).
+    public func normalized() -> ReadingPreferences {
+        var copy = self
+        copy.fontScale = Self.nearestStep(to: fontScale)
+        return copy
+    }
+
+    private func steppedFont(by delta: Int) -> ReadingPreferences {
+        let steps = Self.fontScaleSteps
+        let current = Self.nearestStepIndex(to: fontScale)
+        let next = min(max(current + delta, 0), steps.count - 1)
+        var copy = self
+        copy.fontScale = steps[next]
+        return copy
+    }
+
+    private static func nearestStepIndex(to value: Double) -> Int {
+        fontScaleSteps.enumerated().min { lhs, rhs in
+            abs(lhs.element - value) < abs(rhs.element - value)
+        }?.offset ?? 1
+    }
+
+    private static func nearestStep(to value: Double) -> Double {
+        fontScaleSteps[nearestStepIndex(to: value)]
+    }
+}
