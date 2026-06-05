@@ -262,6 +262,9 @@ struct ContentView: View {
                             }
                         }
                         .contextMenu {
+                            Button("Reveal in Finder") { FileSystemActions.revealInFinder(path: root.path) }
+                            Button("Copy Path") { FileSystemActions.copyToPasteboard(root.path) }
+                            Divider()
                             Button("Remove Folder from Workspace") { removeRoot(root) }
                             Divider()
                             Button("Close All Folders") { closeWorkspace() }
@@ -423,6 +426,7 @@ struct ContentView: View {
                         .font(.system(.caption, design: .default))
                 }
                 .help(node.path)
+                .contextMenu { entryContextMenu(path: node.path, rootPath: node.rootPath) }
             })
         } else {
             return AnyView(
@@ -434,7 +438,18 @@ struct ContentView: View {
                 .help(node.path)
                 .tag(node.entry.id)
                 .contentShape(Rectangle())
+                .contextMenu { entryContextMenu(path: node.path, rootPath: node.rootPath) }
             )
+        }
+    }
+
+    @ViewBuilder
+    private func entryContextMenu(path: String, rootPath: String) -> some View {
+        Button("Reveal in Finder") { FileSystemActions.revealInFinder(path: path) }
+        Divider()
+        Button("Copy Path") { FileSystemActions.copyToPasteboard(path) }
+        Button("Copy Relative Path") {
+            FileSystemActions.copyToPasteboard(FileSystemPaths.relative(of: path, under: rootPath))
         }
     }
 
