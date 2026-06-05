@@ -47,6 +47,8 @@ struct CodeTextView: NSViewRepresentable {
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude
         )
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
         textView.coordinator = context.coordinator
 
         let scrollView = NSScrollView()
