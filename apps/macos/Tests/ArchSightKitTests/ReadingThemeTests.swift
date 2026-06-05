@@ -31,4 +31,22 @@ final class ReadingThemeTests: XCTestCase {
         XCTAssertEqual(p.syntaxColor(for: "string"), p.string)
         XCTAssertEqual(p.syntaxColor(for: "unknown"), p.foreground) // fallback
     }
+
+    func testRGBAParsesSixDigitHex() {
+        let color = RGBA(hex: "#268bd2")
+        XCTAssertNotNil(color)
+        XCTAssertEqual(color!.red, 0x26 / 255.0, accuracy: 0.001)
+        XCTAssertEqual(color!.green, 0x8b / 255.0, accuracy: 0.001)
+        XCTAssertEqual(color!.blue, 0xd2 / 255.0, accuracy: 0.001)
+        XCTAssertEqual(color!.alpha, 1.0, accuracy: 0.001)
+    }
+
+    func testRGBAAcceptsHexWithoutHashAndIsCaseInsensitive() {
+        XCTAssertEqual(RGBA(hex: "FFFFFF"), RGBA(hex: "#ffffff"))
+    }
+
+    func testRGBARejectsMalformedHex() {
+        XCTAssertNil(RGBA(hex: "#12"))
+        XCTAssertNil(RGBA(hex: "#gggggg"))
+    }
 }

@@ -102,3 +102,24 @@ public struct ReadingTheme: Sendable {
         ),
     ]
 }
+
+public struct RGBA: Equatable, Sendable {
+    public let red: Double
+    public let green: Double
+    public let blue: Double
+    public let alpha: Double
+
+    /// Parses `#rrggbb` (with or without leading `#`, case-insensitive).
+    /// Returns nil for any other format.
+    public init?(hex: String) {
+        var value = hex
+        if value.hasPrefix("#") { value.removeFirst() }
+        guard value.count == 6,
+              let int = UInt32(value, radix: 16)
+        else { return nil }
+        red = Double((int >> 16) & 0xff) / 255.0
+        green = Double((int >> 8) & 0xff) / 255.0
+        blue = Double(int & 0xff) / 255.0
+        alpha = 1.0
+    }
+}
