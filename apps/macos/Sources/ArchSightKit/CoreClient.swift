@@ -17,6 +17,8 @@ public struct CoreClientError: Error, Equatable, Sendable {
 
 public protocol CoreServicing: AnyObject {
     func openWorkspace(roots: [String]) throws -> OpenWorkspaceResult
+    func addRoots(workspaceId: String, roots: [String]) throws -> OpenWorkspaceResult
+    func removeRoot(workspaceId: String, rootId: String) throws -> ListTreeResult
     func listTree(workspaceId: String) throws -> ListTreeResult
     func openFile(workspaceId: String, rootId: String, path: String) throws -> OpenFileResult
     func search(workspaceId: String, pattern: String) throws -> SearchResult
@@ -42,6 +44,22 @@ public final class CoreClient: CoreHealthChecking, CoreServicing {
 
     public func openWorkspace(roots: [String]) throws -> OpenWorkspaceResult {
         try send(.openWorkspace, params: OpenWorkspaceParams(roots: roots), resultType: OpenWorkspaceResult.self)
+    }
+
+    public func addRoots(workspaceId: String, roots: [String]) throws -> OpenWorkspaceResult {
+        try send(
+            .addRoots,
+            params: AddRootsParams(workspaceId: workspaceId, roots: roots),
+            resultType: OpenWorkspaceResult.self
+        )
+    }
+
+    public func removeRoot(workspaceId: String, rootId: String) throws -> ListTreeResult {
+        try send(
+            .removeRoot,
+            params: RemoveRootParams(workspaceId: workspaceId, rootId: rootId),
+            resultType: ListTreeResult.self
+        )
     }
 
     public func listTree(workspaceId: String) throws -> ListTreeResult {

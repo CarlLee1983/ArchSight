@@ -115,9 +115,24 @@ private final class FakeCoreClient: CoreServicing {
     private(set) var openFileCalls: [(workspaceId: String, rootId: String, path: String)] = []
     private(set) var searchCalls: [(workspaceId: String, pattern: String)] = []
 
+    var addRootsResult = OpenWorkspaceResult(workspaceId: "ws_1", status: "scanning", roots: [])
+    var removeRootResult = ListTreeResult(workspaceId: "ws_1", status: "ready", roots: [], entries: [], error: nil)
+    private(set) var addRootsCalls: [(workspaceId: String, roots: [String])] = []
+    private(set) var removeRootCalls: [(workspaceId: String, rootId: String)] = []
+
     func openWorkspace(roots: [String]) throws -> OpenWorkspaceResult {
         openCalls.append(roots)
         return openResult
+    }
+
+    func addRoots(workspaceId: String, roots: [String]) throws -> OpenWorkspaceResult {
+        addRootsCalls.append((workspaceId, roots))
+        return addRootsResult
+    }
+
+    func removeRoot(workspaceId: String, rootId: String) throws -> ListTreeResult {
+        removeRootCalls.append((workspaceId, rootId))
+        return removeRootResult
     }
 
     func listTree(workspaceId: String) throws -> ListTreeResult {

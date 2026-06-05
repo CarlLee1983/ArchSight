@@ -115,6 +115,14 @@ private final class StubServicing: CoreServicing {
         OpenWorkspaceResult(workspaceId: "ws_1", status: "ready", roots: [])
     }
 
+    func addRoots(workspaceId: String, roots: [String]) throws -> OpenWorkspaceResult {
+        OpenWorkspaceResult(workspaceId: workspaceId, status: "ready", roots: [])
+    }
+
+    func removeRoot(workspaceId: String, rootId: String) throws -> ListTreeResult {
+        ListTreeResult(workspaceId: workspaceId, status: "ready", roots: [], entries: [], error: nil)
+    }
+
     func listTree(workspaceId: String) throws -> ListTreeResult {
         ListTreeResult(workspaceId: workspaceId, status: "ready", roots: [], entries: [], error: nil)
     }
