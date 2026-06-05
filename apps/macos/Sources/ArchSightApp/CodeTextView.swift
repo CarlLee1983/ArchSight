@@ -9,29 +9,16 @@ import SwiftUI
 struct CodeTextView: NSViewRepresentable {
     let content: String
     var tokens: [SyntaxToken] = []
+    var preferences: ReadingPreferences = .default
     var scrollToLine: Int?
     var onDefinition: (Int, Int) -> Void
     var onReferences: (Int, Int) -> Void
 
+    private var theme: ReadingTheme { ReadingTheme.theme(for: preferences.theme) }
+    private var codeFont: NSFont { ReadingThemeAppKit.font(scale: preferences.fontScale) }
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
-    }
-
-    private static let codeFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-
-    /// Maps a canonical token type to a dynamic system color so highlighting
-    /// follows light/dark appearance automatically.
-    static func color(for type: String) -> NSColor {
-        switch type {
-        case "keyword": return .systemPink
-        case "string": return .systemRed
-        case "comment": return .secondaryLabelColor
-        case "number", "constant": return .systemOrange
-        case "function": return .systemBlue
-        case "type": return .systemPurple
-        case "operator": return .secondaryLabelColor
-        default: return .labelColor
-        }
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -45,8 +32,10 @@ struct CodeTextView: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
-        textView.font = Self.codeFont
-        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.font = codeFont
+        textView.backgroundColor = ReadingThemeAppKit.backgroundColor(for: theme)
+        let inset = preferences.lineSpacing.textInset
+        textView.textContainerInset = NSSize(width: CGFloat(inset), height: CGFloat(inset))
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = true
         textView.textContainer?.widthTracksTextView = false
@@ -75,19 +64,31 @@ struct CodeTextView: NSViewRepresentable {
         context.coordinator.onDefinition = onDefinition
         context.coordinator.onReferences = onReferences
 
-        if textView.string != content {
+        let signature = "\(preferences.theme.rawValue)|\(preferences.fontScale)|\(preferences.lineSpacing.rawValue)"
+        if textView.string != content || context.coordinator.lastStyleSignature != signature {
+            let paragraph = ReadingThemeAppKit.paragraphStyle(for: preferences.lineSpacing)
             let attributed = NSMutableAttributedString(
                 string: content,
                 attributes: [
-                    .font: Self.codeFont,
-                    .foregroundColor: NSColor.labelColor,
+                    .font: codeFont,
+                    .foregroundColor: ReadingThemeAppKit.foregroundColor(for: theme),
+                    .paragraphStyle: paragraph,
                 ]
             )
             for span in SyntaxHighlighting.spans(for: tokens, in: content) where NSMaxRange(span.range) <= attributed.length {
-                attributed.addAttribute(.foregroundColor, value: Self.color(for: span.type), range: span.range)
+                attributed.addAttribute(
+                    .foregroundColor,
+                    value: ReadingThemeAppKit.syntaxColor(for: span.type, theme: theme),
+                    range: span.range
+                )
             }
             textView.textStorage?.setAttributedString(attributed)
+            textView.backgroundColor = ReadingThemeAppKit.backgroundColor(for: theme)
+            textView.font = codeFont
+            let inset = preferences.lineSpacing.textInset
+            textView.textContainerInset = NSSize(width: CGFloat(inset), height: CGFloat(inset))
             textView.lastScrolledLine = nil
+            context.coordinator.lastStyleSignature = signature
         }
         if let line = scrollToLine, line != textView.lastScrolledLine {
             textView.scrollToLine(line)
@@ -98,6 +99,7 @@ struct CodeTextView: NSViewRepresentable {
     final class Coordinator {
         var onDefinition: (Int, Int) -> Void = { _, _ in }
         var onReferences: (Int, Int) -> Void = { _, _ in }
+        var lastStyleSignature: String?
     }
 }
 
