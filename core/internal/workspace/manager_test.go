@@ -229,6 +229,66 @@ func TestAddRootsUnknownWorkspaceErrors(t *testing.T) {
 	}
 }
 
+func TestRemoveRootDropsRootAndItsEntriesKeepingOthers(t *testing.T) {
+	dirA := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dirA, "a.txt"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dirB := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dirB, "b.txt"), []byte("b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manager := NewManager()
+	opened, err := manager.Open(context.Background(), []string{dirA, dirB})
+	if err != nil {
+		t.Fatalf("Open error: %v", err)
+	}
+	waitForSnapshot(t, manager, opened.ID)
+
+	removed, err := manager.RemoveRoot(opened.ID, "root_1")
+	if err != nil {
+		t.Fatalf("RemoveRoot error: %v", err)
+	}
+	if len(removed.Roots) != 1 || removed.Roots[0].ID != "root_2" {
+		t.Fatalf("expected only root_2 to remain, got %+v", removed.Roots)
+	}
+	for _, e := range removed.Entries {
+		if e.RootID == "root_1" {
+			t.Fatalf("entries for removed root should be gone, found %s", e.Path)
+		}
+	}
+
+	got, ok := manager.Get(opened.ID)
+	if !ok {
+		t.Fatal("snapshot was not stored")
+	}
+	if len(got.Roots) != 1 || got.Roots[0].ID != "root_2" {
+		t.Fatalf("expected persisted snapshot to keep only root_2, got %+v", got.Roots)
+	}
+	for _, e := range got.Entries {
+		if e.RootID == "root_1" {
+			t.Fatalf("persisted entries for removed root should be gone, found %s", e.Path)
+		}
+	}
+}
+
+func TestRemoveRootUnknownWorkspaceErrors(t *testing.T) {
+	manager := NewManager()
+	if _, err := manager.RemoveRoot("ws_missing", "root_1"); err == nil {
+		t.Fatal("expected error for unknown workspace")
+	}
+}
+
+func TestRemoveRootUnknownErrors(t *testing.T) {
+	dirA := t.TempDir()
+	manager := NewManager()
+	opened, _ := manager.Open(context.Background(), []string{dirA})
+	waitForSnapshot(t, manager, opened.ID)
+	if _, err := manager.RemoveRoot(opened.ID, "root_99"); err == nil {
+		t.Fatal("expected error for unknown root")
+	}
+}
+
 func TestOpenAssignsSequentialRootIDsFromOne(t *testing.T) {
 	dirA := t.TempDir()
 	dirB := t.TempDir()

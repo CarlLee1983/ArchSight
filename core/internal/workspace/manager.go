@@ -170,6 +170,43 @@ func (m *Manager) finishAppend(id string, err error, newEntries []Entry) {
 	delete(m.cancels, id)
 }
 
+// RemoveRoot removes a single root and all of its entries from the workspace.
+// Remaining roots keep their ids; the id of the removed root is not reused.
+func (m *Manager) RemoveRoot(id, rootID string) (Snapshot, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	snapshot, ok := m.snapshots[id]
+	if !ok {
+		return Snapshot{}, fmt.Errorf("workspace not found: %s", id)
+	}
+	index := -1
+	for i, root := range snapshot.Roots {
+		if root.ID == rootID {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		return Snapshot{}, fmt.Errorf("workspace root not found: %s", rootID)
+	}
+
+	roots := make([]Root, 0, len(snapshot.Roots)-1)
+	roots = append(roots, snapshot.Roots[:index]...)
+	roots = append(roots, snapshot.Roots[index+1:]...)
+	snapshot.Roots = roots
+
+	entries := make([]Entry, 0, len(snapshot.Entries))
+	for _, entry := range snapshot.Entries {
+		if entry.RootID != rootID {
+			entries = append(entries, entry)
+		}
+	}
+	snapshot.Entries = entries
+
+	return cloneSnapshot(snapshot), nil
+}
+
 func (m *Manager) Get(id string) (Snapshot, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
