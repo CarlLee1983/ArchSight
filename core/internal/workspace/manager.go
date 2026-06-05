@@ -44,11 +44,12 @@ type Entry struct {
 }
 
 type Snapshot struct {
-	ID      string  `json:"id"`
-	Status  Status  `json:"status"`
-	Roots   []Root  `json:"roots"`
-	Entries []Entry `json:"entries"`
-	Error   string  `json:"error,omitempty"`
+	ID          string  `json:"id"`
+	Status      Status  `json:"status"`
+	Roots       []Root  `json:"roots"`
+	Entries     []Entry `json:"entries"`
+	Error       string  `json:"error,omitempty"`
+	nextRootSeq uint64
 }
 
 type Manager struct {
@@ -68,7 +69,7 @@ func NewManager() *Manager {
 }
 
 func (m *Manager) Open(parent context.Context, rootPaths []string) (Snapshot, error) {
-	roots, err := buildRoots(rootPaths)
+	roots, nextSeq, err := buildRootsFrom(rootPaths, 1)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -76,9 +77,10 @@ func (m *Manager) Open(parent context.Context, rootPaths []string) (Snapshot, er
 	id := fmt.Sprintf("ws_%d", m.nextID.Add(1))
 	ctx, cancel := context.WithCancel(parent)
 	snapshot := &Snapshot{
-		ID:     id,
-		Status: StatusScanning,
-		Roots:  roots,
+		ID:          id,
+		Status:      StatusScanning,
+		Roots:       roots,
+		nextRootSeq: nextSeq,
 	}
 
 	m.mu.Lock()
@@ -152,31 +154,34 @@ func (m *Manager) finish(id string, err error, entries []Entry) {
 	delete(m.cancels, id)
 }
 
-func buildRoots(rootPaths []string) ([]Root, error) {
+func buildRootsFrom(rootPaths []string, startSeq uint64) ([]Root, uint64, error) {
+	// Return startSeq on all errors: no IDs were consumed, so callers may retry without gaps.
 	if len(rootPaths) == 0 {
-		return nil, errors.New("at least one root path is required")
+		return nil, startSeq, errors.New("at least one root path is required")
 	}
 
+	seq := startSeq
 	roots := make([]Root, 0, len(rootPaths))
-	for i, rootPath := range rootPaths {
+	for _, rootPath := range rootPaths {
 		cleaned, err := filepath.Abs(rootPath)
 		if err != nil {
-			return nil, err
+			return nil, startSeq, err
 		}
 		info, err := os.Stat(cleaned)
 		if err != nil {
-			return nil, err
+			return nil, startSeq, err
 		}
 		if !info.IsDir() {
-			return nil, fmt.Errorf("workspace root is not a directory: %s", cleaned)
+			return nil, startSeq, fmt.Errorf("workspace root is not a directory: %s", cleaned)
 		}
 		roots = append(roots, Root{
-			ID:   fmt.Sprintf("root_%d", i+1),
+			ID:   fmt.Sprintf("root_%d", seq),
 			Name: filepath.Base(cleaned),
 			Path: cleaned,
 		})
+		seq++
 	}
-	return roots, nil
+	return roots, seq, nil
 }
 
 func (m *Manager) scanRoot(ctx context.Context, root Root, entries *[]Entry) error {
@@ -229,10 +234,11 @@ func shouldIgnoreDir(name string) bool {
 
 func cloneSnapshot(snapshot *Snapshot) Snapshot {
 	return Snapshot{
-		ID:      snapshot.ID,
-		Status:  snapshot.Status,
-		Roots:   slices.Clone(snapshot.Roots),
-		Entries: slices.Clone(snapshot.Entries),
-		Error:   snapshot.Error,
+		ID:          snapshot.ID,
+		Status:      snapshot.Status,
+		Roots:       slices.Clone(snapshot.Roots),
+		Entries:     slices.Clone(snapshot.Entries),
+		Error:       snapshot.Error,
+		nextRootSeq: snapshot.nextRootSeq,
 	}
 }

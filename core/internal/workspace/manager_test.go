@@ -180,3 +180,23 @@ func listAllPaths(t *testing.T, root string) []string {
 	slices.Sort(paths)
 	return paths
 }
+
+func TestOpenAssignsSequentialRootIDsFromOne(t *testing.T) {
+	dirA := t.TempDir()
+	dirB := t.TempDir()
+	manager := NewManager()
+
+	snapshot, err := manager.Open(context.Background(), []string{dirA, dirB})
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if len(snapshot.Roots) != 2 {
+		t.Fatalf("expected 2 roots, got %d", len(snapshot.Roots))
+	}
+	if snapshot.Roots[0].ID != "root_1" || snapshot.Roots[1].ID != "root_2" {
+		t.Fatalf("unexpected root ids: %s, %s", snapshot.Roots[0].ID, snapshot.Roots[1].ID)
+	}
+	if snapshot.nextRootSeq != 3 {
+		t.Fatalf("expected nextRootSeq=3, got %d", snapshot.nextRootSeq)
+	}
+}
