@@ -20,10 +20,10 @@ struct ReadingControlsView: View {
 
             HStack(spacing: 2) {
                 Button { store.decreaseFont() } label: { Image(systemName: "textformat.size.smaller") }
-                    .disabled(store.preferences.fontScale <= ReadingPreferences.fontScaleSteps.first!)
+                    .disabled(store.preferences.fontScale <= ReadingPreferences.minFontScale)
                     .help("Decrease text size")
                 Button { store.increaseFont() } label: { Image(systemName: "textformat.size.larger") }
-                    .disabled(store.preferences.fontScale >= ReadingPreferences.fontScaleSteps.last!)
+                    .disabled(store.preferences.fontScale >= ReadingPreferences.maxFontScale)
                     .help("Increase text size")
             }
 

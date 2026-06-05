@@ -49,4 +49,9 @@ final class ReadingThemeTests: XCTestCase {
         XCTAssertNil(RGBA(hex: "#12"))
         XCTAssertNil(RGBA(hex: "#gggggg"))
     }
+
+    func testDarkThemeColorSchemeIsDark() {
+        XCTAssertEqual(ReadingTheme.theme(for: .solarized).cssColorScheme, "dark")
+        XCTAssertEqual(ReadingTheme.theme(for: .highContrast).cssColorScheme, "dark")
+    }
 }

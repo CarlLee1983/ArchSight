@@ -66,6 +66,10 @@ public struct ReadingPreferences: Equatable, Sendable, Codable {
     /// Discrete font scale steps used by the A- / A+ controls.
     public static let fontScaleSteps: [Double] = [0.85, 1.0, 1.15, 1.3, 1.5]
 
+    /// Smallest / largest available font scale, derived from `fontScaleSteps`.
+    public static let minFontScale: Double = fontScaleSteps.first ?? 1.0
+    public static let maxFontScale: Double = fontScaleSteps.last ?? 1.0
+
     public func increasedFont() -> ReadingPreferences {
         steppedFont(by: 1)
     }

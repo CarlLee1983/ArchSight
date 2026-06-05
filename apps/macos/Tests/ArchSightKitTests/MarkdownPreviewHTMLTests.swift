@@ -63,4 +63,10 @@ final class MarkdownPreviewHTMLTests: XCTestCase {
         let html = MarkdownPreviewHTML.render("# Hi", preferences: .default)
         XCTAssertTrue(html.contains("color-scheme: light dark;"))
     }
+
+    func testDarkThemeInjectsHexAndDarkColorScheme() {
+        let html = MarkdownPreviewHTML.render("# Hi", preferences: ReadingPreferences(theme: .solarized, fontScale: 1.0, lineSpacing: .normal))
+        XCTAssertTrue(html.contains("--bg: #002b36"))
+        XCTAssertTrue(html.contains("color-scheme: dark;"))
+    }
 }

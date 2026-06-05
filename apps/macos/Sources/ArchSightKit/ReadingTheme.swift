@@ -22,7 +22,7 @@ public struct ReadingPalette: Equatable, Sendable {
     public let op: String
 
     /// Maps a canonical syntax token type to its hex color, mirroring
-    /// `CodeTextView.color(for:)`. Falls back to `foreground`.
+    /// `ReadingThemeAppKit.dynamicSyntaxColor(for:)`. Falls back to `foreground`.
     public func syntaxColor(for type: String) -> String {
         switch type {
         case "keyword": return keyword
@@ -63,6 +63,9 @@ public struct ReadingTheme: Sendable {
         ReadingTheme(
             id: .system,
             appearance: .system,
+            // Hex values are placeholders never used at runtime: isDynamic gates both
+            // the CSS adapter (which emits Canvas/CanvasText tokens) and AppKit's
+            // dynamicSyntaxColor(for:) (which uses NSColor system colors instead).
             palette: ReadingPalette(
                 background: "#ffffff", foreground: "#000000", secondaryText: "#3c3c43",
                 border: "#d0d0d0", blockquote: "#3c3c43", codeBackground: "#f5f5f5",

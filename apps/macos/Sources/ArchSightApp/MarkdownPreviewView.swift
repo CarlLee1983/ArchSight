@@ -23,7 +23,11 @@ struct MarkdownPreviewView: NSViewRepresentable {
         // Named themes paint their own background via CSS; the system theme stays
         // transparent so it sits flush on the SwiftUI background.
         let theme = ReadingTheme.theme(for: preferences.theme)
-        webView.setValue(!theme.isDynamic, forKey: "drawsBackground")
+        let drawsBackground = !theme.isDynamic
+        if context.coordinator.lastDrawsBackground != drawsBackground {
+            webView.setValue(drawsBackground, forKey: "drawsBackground")
+            context.coordinator.lastDrawsBackground = drawsBackground
+        }
 
         let html = MarkdownPreviewHTML.render(content, preferences: preferences)
         guard context.coordinator.lastHTML != html else {
@@ -35,5 +39,6 @@ struct MarkdownPreviewView: NSViewRepresentable {
 
     final class Coordinator {
         var lastHTML: String?
+        var lastDrawsBackground: Bool?
     }
 }
