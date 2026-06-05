@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var coreSession = CoreSessionFactory.fromEnvironment()
     @State private var coreEndpoint: CoreServiceEndpoint?
     @State private var expandedPaths: Set<String> = []
+    @State private var activeSearchTask: Task<Void, Never>? = nil
 
     @State private var history = NavigationHistory()
     @State private var isSplit = false
@@ -156,7 +157,7 @@ struct ContentView: View {
             
             Spacer()
         }
-        .padding(.top, 40)
+        .padding(.top, 8)
         .padding(.horizontal, 6)
         .frame(width: 48)
         .background(Color(NSColor.windowBackgroundColor))
@@ -741,19 +742,23 @@ struct ContentView: View {
     }
 
     private func runSearch() {
+        activeSearchTask?.cancel()
         guard let endpoint = coreEndpoint, let workspaceId = state.workspaceId else { return }
         let pattern = state.searchQuery
         guard !pattern.isEmpty else {
             state.searchResults = []
             return
         }
-        Task {
+        activeSearchTask = Task {
             do {
                 let matches = try await Task.detached {
                     try endpoint.makeController().search(workspaceId: workspaceId, pattern: pattern)
                 }.value
+                try Task.checkCancellation()
                 state.searchResults = matches
                 state.errorMessage = matches.isEmpty ? "No matches for \"\(pattern)\"." : nil
+            } catch is CancellationError {
+                // Task was cancelled, ignore updates
             } catch {
                 state.searchResults = []
                 state.errorMessage = Self.describe(error)
