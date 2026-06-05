@@ -24,6 +24,9 @@ func Highlight(path, content string) Result {
 	if language == "" {
 		return Result{Tokens: []Token{}}
 	}
+	if language == "go" {
+		return Result{Language: language, Tokens: highlightGo(content)}
+	}
 	return Result{
 		Language: language,
 		Tokens:   keywordTokens(language, content),
