@@ -6,6 +6,9 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @State private var state = WorkspaceViewState()
     @State private var expandedPaths: Set<String> = []
+    /// Root ids the user has collapsed. Empty = all roots expanded, so newly
+    /// dragged-in folders default to expanded without seeding state.
+    @State private var collapsedRoots: Set<WorkspaceRoot.ID> = []
     @State private var activeSearchTask: Task<Void, Never>? = nil
 
     @State private var history = NavigationHistory()
@@ -231,7 +234,17 @@ struct ContentView: View {
                 
                 List(selection: $sidebarSelection) {
                     ForEach(state.roots) { root in
-                        Section(root.name) {
+                        let rootExpanded = Binding<Bool>(
+                            get: { !collapsedRoots.contains(root.id) },
+                            set: { expanded in
+                                if expanded {
+                                    collapsedRoots.remove(root.id)
+                                } else {
+                                    collapsedRoots.insert(root.id)
+                                }
+                            }
+                        )
+                        Section(root.name, isExpanded: rootExpanded) {
                             let nodes = sidebarTreeNodes[root.id, default: []]
                             if nodes.isEmpty {
                                 Text("No files")
@@ -765,6 +778,7 @@ struct ContentView: View {
         expandedPaths = expandedPaths.filter { path in
             path != root.path && !path.hasPrefix(root.path + "/")
         }
+        collapsedRoots.remove(root.id)
         state.removeRoot(id: root.id)
         refreshSidebarTreeNodes()
         guard let endpoint = coreEndpoint, let workspaceId = state.workspaceId else { return }
@@ -784,6 +798,7 @@ struct ContentView: View {
 
     private func closeWorkspace() {
         expandedPaths = []
+        collapsedRoots = []
         state.closeWorkspace()
         refreshSidebarTreeNodes()
     }
