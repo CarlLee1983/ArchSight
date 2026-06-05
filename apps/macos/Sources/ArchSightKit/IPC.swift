@@ -3,6 +3,8 @@ import Foundation
 public enum IPCMethod: String, Codable, Sendable {
     case health
     case openWorkspace
+    case addRoots
+    case removeRoot
     case listTree
     case openFile
     case search
@@ -38,6 +40,26 @@ public struct OpenWorkspaceParams: Encodable, Equatable, Sendable {
 
     public init(roots: [String]) {
         self.roots = roots
+    }
+}
+
+public struct AddRootsParams: Encodable, Equatable, Sendable {
+    public let workspaceId: String
+    public let roots: [String]
+
+    public init(workspaceId: String, roots: [String]) {
+        self.workspaceId = workspaceId
+        self.roots = roots
+    }
+}
+
+public struct RemoveRootParams: Encodable, Equatable, Sendable {
+    public let workspaceId: String
+    public let rootId: String
+
+    public init(workspaceId: String, rootId: String) {
+        self.workspaceId = workspaceId
+        self.rootId = rootId
     }
 }
 
