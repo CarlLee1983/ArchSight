@@ -16,6 +16,8 @@ struct ContentView: View {
     @State private var sidebarFileEntriesByID: [WorkspaceEntry.ID: WorkspaceEntry] = [:]
     @State private var searchSelection: SearchMatch.ID?
     @State private var pendingScrollLine: Int?
+    @State private var markdownDisplayMode: MarkdownDisplayMode = .preview
+    @Environment(ReadingPreferencesStore.self) private var readingStore
 
     var body: some View {
         NavigationSplitView {
@@ -242,7 +244,7 @@ struct ContentView: View {
     @ViewBuilder
     private var primaryPane: some View {
         if let tab = selectedTab {
-            codeView(for: tab, scrollLine: pendingScrollLine)
+            filePane(for: tab, scrollLine: pendingScrollLine)
                 .navigationTitle(tab.path)
         } else {
             ContentUnavailableView("Read Only", systemImage: "eye")
@@ -264,9 +266,50 @@ struct ContentView: View {
             .padding(6)
             Divider()
             if let tab = comparisonTab {
-                codeView(for: tab, scrollLine: nil)
+                filePane(for: tab, scrollLine: nil)
             } else {
                 ContentUnavailableView("Pick a File", systemImage: "rectangle.split.2x1")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func filePane(for tab: FileTab, scrollLine: Int?) -> some View {
+        if tab.canPreviewMarkdown {
+            VStack(spacing: 0) {
+                HStack {
+                    Picker("Markdown display", selection: $markdownDisplayMode) {
+                        Label("Preview", systemImage: "doc.richtext")
+                            .tag(MarkdownDisplayMode.preview)
+                        Label("Source", systemImage: "chevron.left.forwardslash.chevron.right")
+                            .tag(MarkdownDisplayMode.source)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 180)
+                    .help("Switch Markdown display")
+                    Spacer()
+                    ReadingControlsView()
+                }
+                .padding(6)
+                Divider()
+
+                switch markdownDisplayMode {
+                case .preview:
+                    MarkdownPreviewView(content: tab.content, preferences: readingStore.preferences)
+                case .source:
+                    codeView(for: tab, scrollLine: scrollLine)
+                }
+            }
+        } else {
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    ReadingControlsView()
+                }
+                .padding(6)
+                Divider()
+                codeView(for: tab, scrollLine: scrollLine)
             }
         }
     }
@@ -275,6 +318,7 @@ struct ContentView: View {
         CodeTextView(
             content: tab.content,
             tokens: tab.tokens,
+            preferences: readingStore.preferences,
             scrollToLine: scrollLine,
             onDefinition: { line, column in requestDefinition(on: tab, line: line, column: column) },
             onReferences: { line, column in requestReferences(on: tab, line: line, column: column) }
@@ -628,4 +672,9 @@ struct ContentView: View {
         }
         return String(describing: error)
     }
+}
+
+private enum MarkdownDisplayMode {
+    case preview
+    case source
 }
