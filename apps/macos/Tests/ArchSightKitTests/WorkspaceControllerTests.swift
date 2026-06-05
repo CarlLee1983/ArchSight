@@ -59,6 +59,51 @@ final class WorkspaceControllerTests: XCTestCase {
         XCTAssertEqual(client.listTreeCalls.count, 3)
     }
 
+    func testAddRootsPollsUntilReady() throws {
+        let client = FakeCoreClient()
+        client.addRootsResult = OpenWorkspaceResult(workspaceId: "ws_1", status: "scanning", roots: [])
+        client.listTreeResults = [
+            makeTree(status: "scanning", entries: []),
+            makeTree(status: "ready", entries: [makeEntry(path: "b.txt", kind: "file")]),
+        ]
+        let controller = WorkspaceController(client: client, pollLimit: 10, sleep: {})
+
+        let result = try controller.addRoots(workspaceId: "ws_1", paths: ["/tmp/b"])
+
+        XCTAssertEqual(result.status, "ready")
+        XCTAssertEqual(result.entries.first?.path, "b.txt")
+        XCTAssertEqual(client.addRootsCalls.first?.roots, ["/tmp/b"])
+        XCTAssertEqual(client.listTreeCalls.count, 2)
+    }
+
+    func testAddRootsThrowsOnFailedStatus() {
+        let client = FakeCoreClient()
+        client.addRootsResult = OpenWorkspaceResult(workspaceId: "ws_1", status: "scanning", roots: [])
+        client.listTreeResults = [makeTree(status: "failed", entries: [], error: "index error")]
+        let controller = WorkspaceController(client: client, pollLimit: 10, sleep: {})
+
+        XCTAssertThrowsError(try controller.addRoots(workspaceId: "ws_1", paths: ["/tmp/b"])) { error in
+            XCTAssertEqual((error as? CoreClientError)?.code, "workspace_failed")
+        }
+    }
+
+    func testRemoveRootReturnsUpdatedTree() throws {
+        let client = FakeCoreClient()
+        client.removeRootResult = ListTreeResult(
+            workspaceId: "ws_1",
+            status: "ready",
+            roots: [WorkspaceRoot(id: "root_2", name: "b", path: "/tmp/b")],
+            entries: [],
+            error: nil
+        )
+        let controller = WorkspaceController(client: client, pollLimit: 10, sleep: {})
+
+        let result = try controller.removeRoot(workspaceId: "ws_1", rootId: "root_1")
+
+        XCTAssertEqual(result.roots.map(\.id), ["root_2"])
+        XCTAssertEqual(client.removeRootCalls.first?.rootId, "root_1")
+    }
+
     func testLoadFileReturnsReadOnlyTab() throws {
         let client = FakeCoreClient()
         client.openFileResult = OpenFileResult(

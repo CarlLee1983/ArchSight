@@ -24,9 +24,27 @@ public final class WorkspaceController {
     @discardableResult
     public func openWorkspace(paths: [String]) throws -> ListTreeResult {
         let opened = try client.openWorkspace(roots: paths)
+        return try awaitReady(workspaceId: opened.workspaceId)
+    }
 
+    /// Appends roots to an existing workspace, then polls until the incremental
+    /// scan settles.
+    @discardableResult
+    public func addRoots(workspaceId: String, paths: [String]) throws -> ListTreeResult {
+        _ = try client.addRoots(workspaceId: workspaceId, roots: paths)
+        return try awaitReady(workspaceId: workspaceId)
+    }
+
+    /// Removes a single root; the core returns the already-settled tree.
+    @discardableResult
+    public func removeRoot(workspaceId: String, rootId: String) throws -> ListTreeResult {
+        try client.removeRoot(workspaceId: workspaceId, rootId: rootId)
+    }
+
+    /// Polls `listTree` until the scan reaches a terminal status ("ready"/unknown) or `pollLimit` is exhausted; throws on "failed" or timeout.
+    private func awaitReady(workspaceId: String) throws -> ListTreeResult {
         for _ in 0..<pollLimit {
-            let tree = try client.listTree(workspaceId: opened.workspaceId)
+            let tree = try client.listTree(workspaceId: workspaceId)
             switch tree.status {
             case "scanning":
                 sleep()
@@ -36,7 +54,6 @@ public final class WorkspaceController {
                 return tree
             }
         }
-
         throw CoreClientError(code: "workspace_timeout", message: "Workspace scan did not finish in time")
     }
 
