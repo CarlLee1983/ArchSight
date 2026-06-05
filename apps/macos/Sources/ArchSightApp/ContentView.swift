@@ -1,3 +1,4 @@
+import AppKit
 import ArchSightKit
 import SwiftUI
 import UniformTypeIdentifiers
@@ -69,6 +70,27 @@ struct ContentView: View {
                 }
             }
         }
+        .focusedValue(\.workspaceCommands, WorkspaceCommandActions(
+            openFolder: { openFolderPicker() },
+            toggleSidebar: {
+                withAnimation(.easeInOut(duration: 0.16)) { isSidebarVisible.toggle() }
+            },
+            focusExplorer: {
+                activeSidebarTab = .explorer
+                withAnimation(.easeInOut(duration: 0.16)) { isSidebarVisible = true }
+            },
+            focusSearch: {
+                activeSidebarTab = .search
+                withAnimation(.easeInOut(duration: 0.16)) { isSidebarVisible = true }
+            },
+            toggleSplit: { isSplit.toggle() },
+            selectTab: { number in selectTab(at: number) },
+            quickOpen: { isQuickOpenPresented = true },
+            goBack: { goBack() },
+            goForward: { goForward() },
+            nextTab: { selectAndRecord { state.selectNextTab() } },
+            previousTab: { selectAndRecord { state.selectPreviousTab() } }
+        ))
     }
 
     // MARK: - Toolbar
@@ -118,19 +140,14 @@ struct ContentView: View {
         }
     }
 
-    /// Hidden buttons that register keyboard shortcuts for keyboard-only review.
+    /// Cmd+W stays a focused hidden button: overriding the system Close item via
+    /// `Commands` is unreliable, but a focused shortcut reliably intercepts it.
+    /// Back/forward/next/prev moved to the "Go" menu to avoid double-binding.
     private var keyboardShortcuts: some View {
-        Group {
-            Button("") { goBack() }.keyboardShortcut("[", modifiers: .command)
-            Button("") { goForward() }.keyboardShortcut("]", modifiers: .command)
-            Button("") { closeSelectedTab() }.keyboardShortcut("w", modifiers: .command)
-            Button("") { selectAndRecord(stateMutation: { state.selectNextTab() }) }
-                .keyboardShortcut("]", modifiers: [.command, .shift])
-            Button("") { selectAndRecord(stateMutation: { state.selectPreviousTab() }) }
-                .keyboardShortcut("[", modifiers: [.command, .shift])
-        }
-        .opacity(0)
-        .frame(width: 0, height: 0)
+        Button("") { closeTabOrWindow() }
+            .keyboardShortcut("w", modifiers: .command)
+            .opacity(0)
+            .frame(width: 0, height: 0)
     }
 
     // MARK: - Sidebar & Activity Bar Views
@@ -890,6 +907,20 @@ struct ContentView: View {
     private func closeSelectedTab() {
         guard let id = state.selectedTabID else { return }
         state.closeTab(id: id)
+    }
+
+    private func selectTab(at oneBasedIndex: Int) {
+        let index = oneBasedIndex - 1
+        guard index >= 0, index < state.openTabs.count else { return }
+        selectAndRecord { state.selectedTabID = state.openTabs[index].id }
+    }
+
+    private func closeTabOrWindow() {
+        if state.selectedTabID != nil {
+            closeSelectedTab()
+        } else {
+            NSApp.keyWindow?.performClose(nil)
+        }
     }
 
     private func selectAndRecord(stateMutation: () -> Void) {

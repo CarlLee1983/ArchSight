@@ -13,6 +13,9 @@ struct ArchSightApp: App {
                 .environment(appCore)
                 .task { appCore.connectIfNeeded() }
         }
+        .commands {
+            WorkspaceMenuCommands(readingStore: readingPreferences)
+        }
 
         Settings {
             ReadingSettingsView()
