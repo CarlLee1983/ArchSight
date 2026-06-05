@@ -24,6 +24,7 @@ struct ContentView: View {
     @State private var searchSelection: SearchMatch.ID?
     @State private var pendingScrollLine: Int?
     @State private var markdownDisplayMode: MarkdownDisplayMode = .preview
+    @State private var isQuickOpenPresented = false
     @Environment(ReadingPreferencesStore.self) private var readingStore
     @Environment(AppCore.self) private var appCore
 
@@ -49,6 +50,24 @@ struct ContentView: View {
         }
         .safeAreaInset(edge: .bottom) {
             statusBar
+        }
+        .overlay {
+            if isQuickOpenPresented {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.12)
+                        .ignoresSafeArea()
+                        .onTapGesture { isQuickOpenPresented = false }
+                    QuickOpenPanel(
+                        entries: state.fileEntries,
+                        onOpen: { entry in
+                            isQuickOpenPresented = false
+                            openEntry(entry)
+                        },
+                        onClose: { isQuickOpenPresented = false }
+                    )
+                    .padding(.top, 40)
+                }
+            }
         }
     }
 
