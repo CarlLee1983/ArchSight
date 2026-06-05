@@ -83,6 +83,29 @@ else
   printf 'SKIP    core tests/build because go is missing\n'
 fi
 
+section "macOS app"
+if command -v swift >/dev/null 2>&1; then
+  if [[ -f "$ROOT_DIR/apps/macos/Package.swift" ]]; then
+    if (cd "$ROOT_DIR/apps/macos" && swift test); then
+      printf 'OK      swift test apps/macos\n'
+    else
+      printf 'FAILED  swift test apps/macos\n'
+      missing=1
+    fi
+
+    if (cd "$ROOT_DIR/apps/macos" && swift build); then
+      printf 'OK      swift build apps/macos\n'
+    else
+      printf 'FAILED  swift build apps/macos\n'
+      missing=1
+    fi
+  else
+    printf 'SKIP    macOS Swift package because apps/macos/Package.swift is missing\n'
+  fi
+else
+  printf 'SKIP    macOS app tests/build because swift is missing\n'
+fi
+
 if [[ "$missing" -eq 0 ]]; then
   printf '\nVerification passed.\n'
   exit 0

@@ -204,6 +204,16 @@ Acceptance criteria:
 
 Implement narrow definition and references support.
 
+Implementation status:
+
+- Added a narrow LSP lifecycle manager under `core/internal/lsp`.
+- Added IPC support for `definition` and `references` with ready-workspace, root identity, relative path, snapshot membership, language detection, and cancellation-aware forwarding.
+- Workspace load and `openFile` do not invoke LSP navigation.
+- Language-server processes start lazily per root/language, are reused, and are stopped on idle cleanup or core shutdown.
+- Completion, code action, diagnostics, and formatting remain unsupported IPC methods.
+- Added minimal JSON-RPC stdio framing for `initialize`, `initialized`, `textDocument/didOpen`, `textDocument/definition`, and `textDocument/references`.
+- Definition and references responses are parsed from LSP file URI locations into ArchSight root/path/range locations.
+
 Tasks:
 
 - Add language-server registry for initial servers such as `gopls` and TypeScript language server.
@@ -223,6 +233,19 @@ Acceptance criteria:
 ### Phase 6: macOS App Shell
 
 Build the first native UI experience.
+
+Implementation status:
+
+- Added a Swift Package under `apps/macos`.
+- Added `ArchSightKit` for IPC envelope models, read-only workspace view state, and core process supervision.
+- Added `ArchSightApp` SwiftUI executable target with a native three-column shell, folder picker, drag/drop root intake, flattened-tree sidebar, read-only file pane, and a working search field.
+- Added a Swift core client and Unix Domain Socket transport for newline-delimited JSON IPC, with a generic request envelope that carries typed params (`openWorkspace`, `listTree`, `openFile`, `search`).
+- Added `CoreClient` methods for `openWorkspace`, `listTree`, `openFile`, and `search` behind a `CoreServicing` protocol, with tested request encoding and structured-error decoding.
+- Added `WorkspaceController` to orchestrate the read-only workflow: open a snapshot, poll `listTree` until the scan settles (with timeout and failed-status surfacing), load files as read-only tabs, and run searches.
+- Added `CoreSession` to own app-side core start, health check, connection status, failure cleanup, and disconnect lifecycle, plus a Sendable `CoreServiceEndpoint` so blocking IPC runs off the main thread while only value types cross the boundary.
+- Wired the SwiftUI shell to connect through `ARCHSIGHT_CORE_PATH`: adding folders reopens the workspace via the core, the sidebar renders the flattened tree grouped by root, tree rows and search matches open files read-only, and the search field runs ripgrep-backed search; a no-core fallback shows chosen roots without tree/file/search.
+- The app shell keeps filesystem scanning, search execution, syntax parsing, and LSP orchestration outside the UI process.
+- Added Swift package build/test coverage (29 tests) and included it in `scripts/verify.sh`; verified the full `openWorkspace → listTree → openFile → search` flow end-to-end against the real Go core with no orphan process after shutdown.
 
 Tasks:
 
