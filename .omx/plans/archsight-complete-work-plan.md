@@ -297,6 +297,15 @@ Acceptance criteria:
 
 Make the project repeatable for local development.
 
+Implementation status:
+
+- Added `scripts/setup.sh` as a safe, report-by-default developer bootstrap: it checks the required toolchain (Go, ripgrep, Xcode/Swift), reports optional language servers (`gopls`, `typescript-language-server`, `sourcekit-lsp`) as never-required, builds `dist/bin/archsight-core`, and prints the exact dev run command. `--install` installs required/recommended tools via Homebrew.
+- Added `scripts/build-app.sh` to assemble a self-contained `dist/ArchSight.app` with the Swift shell in `Contents/MacOS`, and `archsight-core` plus `rg` under `Contents/Resources/bin`, so the shipped app runs with no environment configuration. Verified end-to-end: the bundle builds and all three binaries are arm64 Mach-O executables in the expected layout.
+- Added core ripgrep resolution `search.ResolveRipgrepPath` (override `ARCHSIGHT_RG_PATH` → bundled `rg` beside the core binary → bare `rg` from `PATH`), wired through `archsight-core` main, with unit tests for each branch.
+- Added Swift `CoreBinaryLocator.resolve` (override `ARCHSIGHT_CORE_PATH` → bundled `Resources/bin/archsight-core` → sibling of the app executable) and routed `CoreSessionFactory.fromEnvironment` through it so the packaged app needs no env var, with unit tests for each branch. A missing core keeps the existing no-core fallback.
+- Documented setup, optional LSP graceful degradation, Tree-sitter grammar status, the bundle layout, and the full binary-resolution precedence in `docs/packaging.md`; added a root `README.md` quickstart; recorded ripgrep/Tree-sitter/LSP packaging decisions in `third_party/README.md`; and added Phase 8 notes to `core/README.md` and `apps/macos/README.md`.
+- Extended `scripts/verify.sh` with Phase 8 artifact checks (`README.md`, `docs/packaging.md`, `scripts/setup.sh`, `scripts/build-app.sh`).
+
 Tasks:
 
 - Add setup script for required tools.

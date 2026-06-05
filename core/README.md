@@ -43,6 +43,13 @@ The core now exposes `definition` and `references` IPC methods for explicit read
 
 The LSP manager owns lazy process lifecycle per workspace root and language, reuses active processes, and stops idle or shutdown servers. It speaks minimal JSON-RPC over `Content-Length` framed stdio: `initialize`, `initialized`, `textDocument/didOpen`, `textDocument/definition`, and `textDocument/references`. Editor-oriented LSP methods such as completion, code actions, diagnostics, and formatting remain unsupported.
 
+## Phase 8 ripgrep Resolution
+
+The core resolves its `ripgrep` binary at startup through
+`search.ResolveRipgrepPath`: an `ARCHSIGHT_RG_PATH` override wins first, then a
+`rg` bundled next to the core executable (the shipped app bundle), then the bare
+`rg` name resolved from `PATH` for development. See `docs/packaging.md`.
+
 Run core verification from the repository root:
 
 ```sh

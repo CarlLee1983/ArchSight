@@ -20,4 +20,14 @@ swift test
 swift build
 ```
 
-The shell currently provides a dense native split view, folder picker and drag/drop root collection, read-only tab state, a core launch plan that passes `--socket` to `archsight-core`, and a tested core client path for `health` over newline-delimited JSON through a Unix Domain Socket. `CoreSession` owns the app-side connect/disconnect lifecycle and can be wired at launch through `ARCHSIGHT_CORE_PATH` with optional `ARCHSIGHT_SOCKET_DIR`. The UI does not scan files, run search, parse syntax, or manage LSP in the UI process.
+The shell currently provides a dense native split view, folder picker and drag/drop root collection, read-only tab state, a core launch plan that passes `--socket` to `archsight-core`, and a tested core client path for `health` over newline-delimited JSON through a Unix Domain Socket. `CoreSession` owns the app-side connect/disconnect lifecycle. The UI does not scan files, run search, parse syntax, or manage LSP in the UI process.
+
+## Core Binary Resolution
+
+`CoreBinaryLocator.resolve` finds the `archsight-core` executable through an
+`ARCHSIGHT_CORE_PATH` override, then a binary bundled at
+`Contents/Resources/bin/archsight-core`, then one beside the running app
+executable. `ARCHSIGHT_SOCKET_DIR` overrides the socket directory (default
+`/tmp`). When nothing resolves, the shell runs a no-core fallback that lists
+chosen roots without tree/file/search/navigation. See `docs/packaging.md` and
+`scripts/build-app.sh`.

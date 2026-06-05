@@ -51,9 +51,18 @@ final class CoreSessionTests: XCTestCase {
     }
 
     func testFactoryReturnsNilWithoutCorePath() {
-        let session = CoreSessionFactory.fromEnvironment(environment: [:])
+        let session = CoreSessionFactory.fromEnvironment(environment: [:], coreExecutable: nil)
 
         XCTAssertNil(session)
+    }
+
+    func testFactoryBuildsSessionWhenCoreResolved() {
+        let session = CoreSessionFactory.fromEnvironment(
+            environment: [:],
+            coreExecutable: URL(fileURLWithPath: "/resolved/archsight-core")
+        )
+
+        XCTAssertNotNil(session)
     }
 }
 

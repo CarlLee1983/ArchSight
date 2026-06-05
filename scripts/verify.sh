@@ -56,6 +56,12 @@ check_file "apps/macos/README.md"
 check_file "core/README.md"
 check_file "third_party/README.md"
 
+section "Phase 8 packaging"
+check_file "README.md"
+check_file "docs/packaging.md"
+check_file "scripts/setup.sh"
+check_file "scripts/build-app.sh"
+
 section "Toolchain"
 check_tool "go" "Install Go before Phase 1 core work."
 check_tool "swift" "Install Xcode or Swift toolchain before macOS app work."

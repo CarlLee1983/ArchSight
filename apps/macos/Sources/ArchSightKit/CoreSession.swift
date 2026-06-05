@@ -77,14 +77,15 @@ public final class CoreSession {
 
 public enum CoreSessionFactory {
     public static func fromEnvironment(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        coreExecutable: URL? = CoreBinaryLocator.resolve()
     ) -> CoreSession? {
-        guard let executablePath = environment["ARCHSIGHT_CORE_PATH"], !executablePath.isEmpty else {
+        guard let coreExecutable else {
             return nil
         }
         let socketDirectory = URL(fileURLWithPath: environment["ARCHSIGHT_SOCKET_DIR"] ?? "/tmp", isDirectory: true)
         let supervisor = CoreProcessSupervisor(
-            coreExecutable: URL(fileURLWithPath: executablePath),
+            coreExecutable: coreExecutable,
             socketDirectory: socketDirectory
         )
         return CoreSession(supervisor: supervisor)
