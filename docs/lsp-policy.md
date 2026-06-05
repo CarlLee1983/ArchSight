@@ -40,6 +40,20 @@ The core owns LSP process lifecycle:
 - Prefer graceful LSP shutdown and process exit.
 - Force-terminate processes that do not exit promptly.
 
+## Current Implementation Status
+
+The initial core implementation establishes the lazy lifecycle boundary:
+
+- `definition` and `references` are the only IPC navigation methods.
+- Workspace open and file open do not start language-server processes.
+- Server processes are keyed by workspace root and language, then reused.
+- Idle and core shutdown paths stop active language-server processes.
+- Unsupported editor-oriented methods remain outside the IPC surface.
+- The LSP client uses minimal JSON-RPC stdio framing for `initialize`, `initialized`, `textDocument/didOpen`, `textDocument/definition`, and `textDocument/references`.
+- Definition and references responses are converted from LSP file URI locations into ArchSight root/path/range locations.
+
+More advanced LSP support remains intentionally out of scope unless it serves explicit read-only navigation.
+
 ## Verification
 
 Tests should prove:

@@ -181,6 +181,48 @@ The result is read-only data for the macOS viewer:
 
 During Phase 4, syntax support uses a thin in-process adapter with a stable token schema and initial language detection for Go, Swift, TypeScript, and Markdown. Unsupported languages return plain text with an empty token list. Tree-sitter can replace the adapter without changing the IPC result shape.
 
+## Definition and References
+
+`definition` and `references` are explicit read-only navigation requests. They require a ready workspace snapshot, preserved root identity, a relative file path inside the snapshot, and a 1-based line/column position.
+
+```json
+{
+  "id": "req_definition",
+  "method": "definition",
+  "params": {
+    "workspaceId": "ws_1",
+    "rootId": "root_1",
+    "path": "cmd/main.go",
+    "line": 12,
+    "column": 8
+  }
+}
+```
+
+Responses use the same stable location shape for definition and references:
+
+```json
+{
+  "id": "req_definition",
+  "ok": true,
+  "result": {
+    "locations": [
+      {
+        "rootId": "root_1",
+        "rootPath": "/Users/alex/Code/service-a",
+        "path": "cmd/target.go",
+        "startLine": 20,
+        "startColumn": 6,
+        "endLine": 20,
+        "endColumn": 12
+      }
+    ]
+  }
+}
+```
+
+Navigation requests are the only IPC methods allowed to activate language servers. `completion`, `codeAction`, `diagnostics`, and `formatting` are intentionally unsupported methods.
+
 ## Streaming
 
 Long-running requests may emit events before a final response:

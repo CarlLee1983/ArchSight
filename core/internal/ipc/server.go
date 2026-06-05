@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cmg/archsight/core/internal/lsp"
 	"github.com/cmg/archsight/core/internal/search"
 	"github.com/cmg/archsight/core/internal/syntax"
 	"github.com/cmg/archsight/core/internal/workspace"
@@ -22,12 +23,14 @@ type Config struct {
 	Version          string
 	WorkspaceManager *workspace.Manager
 	Searcher         search.Searcher
+	Navigator        lsp.Navigator
 }
 
 type Server struct {
 	config     Config
 	workspaces *workspace.Manager
 	searcher   search.Searcher
+	navigator  lsp.Navigator
 	listener   net.Listener
 	done       chan struct{}
 	once       sync.Once
@@ -49,10 +52,15 @@ func NewServer(config Config) *Server {
 	if searcher == nil {
 		searcher = search.NewRipgrepSearcher(search.Options{})
 	}
+	navigator := config.Navigator
+	if navigator == nil {
+		navigator = lsp.NewManager(lsp.Options{})
+	}
 	return &Server{
 		config:     config,
 		workspaces: manager,
 		searcher:   searcher,
+		navigator:  navigator,
 		done:       make(chan struct{}),
 		active:     make(map[string]context.CancelFunc),
 	}
@@ -94,6 +102,9 @@ func (s *Server) Shutdown() error {
 	var err error
 	s.once.Do(func() {
 		close(s.done)
+		if shutdowner, ok := s.navigator.(interface{ Shutdown() }); ok {
+			shutdowner.Shutdown()
+		}
 		if s.listener != nil {
 			err = s.listener.Close()
 		}
@@ -136,6 +147,10 @@ func (s *Server) dispatch(req Request) Response {
 		return s.openFile(req)
 	case "search":
 		return s.search(req)
+	case "definition":
+		return s.definition(req)
+	case "references":
+		return s.references(req)
 	case "cancel":
 		return s.cancel(req)
 	default:
@@ -183,6 +198,18 @@ type openFileParams struct {
 	WorkspaceID string `json:"workspaceId"`
 	RootID      string `json:"rootId"`
 	Path        string `json:"path"`
+}
+
+type navigationParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	RootID      string `json:"rootId"`
+	Path        string `json:"path"`
+	Line        int    `json:"line"`
+	Column      int    `json:"column"`
+}
+
+type navigationResult struct {
+	Locations []lsp.Location `json:"locations"`
 }
 
 type openFileResult struct {
@@ -339,6 +366,86 @@ func (s *Server) search(req Request) Response {
 		return ErrorResponse(req.ID, err)
 	}
 	return SuccessResponse(req.ID, searchResult{Matches: matches})
+}
+
+func (s *Server) definition(req Request) Response {
+	return s.navigate(req, func(ctx context.Context, navReq lsp.Request) ([]lsp.Location, error) {
+		return s.navigator.Definition(ctx, navReq)
+	})
+}
+
+func (s *Server) references(req Request) Response {
+	return s.navigate(req, func(ctx context.Context, navReq lsp.Request) ([]lsp.Location, error) {
+		return s.navigator.References(ctx, navReq)
+	})
+}
+
+func (s *Server) navigate(req Request, call func(context.Context, lsp.Request) ([]lsp.Location, error)) Response {
+	navReq, respErr := s.navigationRequest(req)
+	if respErr != nil {
+		return *respErr
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.trackActive(req.ID, cancel)
+	defer s.untrackActive(req.ID)
+
+	locations, err := call(ctx, navReq)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return ErrorResponse(req.ID, NewError("context_canceled", "Request canceled"))
+		}
+		var lspErr *lsp.Error
+		if lsp.AsError(err, &lspErr) {
+			return ErrorResponse(req.ID, NewError(lspErr.Code, lspErr.Message))
+		}
+		return ErrorResponse(req.ID, err)
+	}
+	return SuccessResponse(req.ID, navigationResult{Locations: locations})
+}
+
+func (s *Server) navigationRequest(req Request) (lsp.Request, *Response) {
+	var params navigationParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		resp := ErrorResponse(req.ID, NewError("invalid_params", err.Error()))
+		return lsp.Request{}, &resp
+	}
+	if params.WorkspaceID == "" || params.RootID == "" || params.Path == "" || params.Line <= 0 || params.Column <= 0 {
+		resp := ErrorResponse(req.ID, NewError("invalid_params", "workspaceId, rootId, path, line, and column are required"))
+		return lsp.Request{}, &resp
+	}
+
+	snapshot, ok := s.workspaces.Get(params.WorkspaceID)
+	if !ok {
+		resp := ErrorResponse(req.ID, NewError("not_found", "Workspace not found: "+params.WorkspaceID))
+		return lsp.Request{}, &resp
+	}
+	if snapshot.Status != workspace.StatusReady {
+		resp := ErrorResponse(req.ID, NewError("workspace_not_ready", "Workspace is not ready: "+params.WorkspaceID))
+		return lsp.Request{}, &resp
+	}
+	root, ok := findRoot(snapshot.Roots, params.RootID)
+	if !ok {
+		resp := ErrorResponse(req.ID, NewError("not_found", "Workspace root not found: "+params.RootID))
+		return lsp.Request{}, &resp
+	}
+	_, relPath, err := resolveWorkspaceFile(root.Path, params.Path)
+	if err != nil {
+		resp := ErrorResponse(req.ID, err)
+		return lsp.Request{}, &resp
+	}
+	if !snapshotHasFile(snapshot.Entries, root.ID, relPath) {
+		resp := ErrorResponse(req.ID, NewError("not_found", "File not found in workspace snapshot: "+relPath))
+		return lsp.Request{}, &resp
+	}
+
+	return lsp.Request{
+		Root:     root,
+		Language: syntax.DetectLanguage(relPath),
+		Path:     relPath,
+		Line:     params.Line,
+		Column:   params.Column,
+	}, nil
 }
 
 func findRoot(roots []workspace.Root, rootID string) (workspace.Root, bool) {

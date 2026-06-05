@@ -37,6 +37,12 @@ The core implements `openFile` for ready workspace snapshots. It reads files on 
 
 Syntax metadata currently comes from a small adapter under `core/internal/syntax`. The adapter detects Go, Swift, TypeScript, and Markdown by extension, emits initial keyword tokens for supported code files, and degrades unsupported languages to plain text. It intentionally keeps the IPC token schema stable so Tree-sitter grammars can replace the adapter without changing the macOS client contract.
 
+## Phase 5 Lazy LSP Lifecycle
+
+The core now exposes `definition` and `references` IPC methods for explicit read-only navigation requests. Workspace load and file open do not start language-server work. Navigation requests validate the ready workspace snapshot, root identity, relative file path, and detected language before reaching the LSP layer.
+
+The LSP manager owns lazy process lifecycle per workspace root and language, reuses active processes, and stops idle or shutdown servers. It speaks minimal JSON-RPC over `Content-Length` framed stdio: `initialize`, `initialized`, `textDocument/didOpen`, `textDocument/definition`, and `textDocument/references`. Editor-oriented LSP methods such as completion, code actions, diagnostics, and formatting remain unsupported.
+
 Run core verification from the repository root:
 
 ```sh
