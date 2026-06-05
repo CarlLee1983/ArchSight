@@ -159,9 +159,7 @@ struct ContentView: View {
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: iconName(for: node))
-                        .foregroundColor(iconColor(for: node))
-                        .imageScale(.small)
+                    nodeIconView(for: node)
                     Text(node.name)
                         .font(.system(.caption, design: .default))
                 }
@@ -170,9 +168,7 @@ struct ContentView: View {
         } else {
             return AnyView(
                 HStack(spacing: 6) {
-                    Image(systemName: iconName(for: node))
-                        .foregroundColor(iconColor(for: node))
-                        .imageScale(.small)
+                    nodeIconView(for: node)
                     Text(node.name)
                         .font(.system(.caption, design: .monospaced))
                 }
@@ -218,9 +214,7 @@ struct ContentView: View {
                 let relativePath = (tab.path as NSString).deletingLastPathComponent
                 
                 HStack(spacing: 10) {
-                    Image(systemName: FileIconMapper.iconName(for: fileName))
-                        .foregroundColor(FileIconMapper.iconColor(for: fileName))
-                        .font(.system(size: 14))
+                    FileIconMapper.iconType(for: fileName).view()
                         .frame(width: 18)
                     
                     VStack(alignment: .leading, spacing: 2) {
@@ -761,18 +755,13 @@ struct ContentView: View {
         }
     }
 
-    private func iconName(for node: WorkspaceTreeNode) -> String {
+    @ViewBuilder @MainActor
+    private func nodeIconView(for node: WorkspaceTreeNode) -> some View {
         if node.isDirectory {
-            return "folder"
+            CustomIconType.folder.view()
+        } else {
+            FileIconMapper.iconType(for: node.name).view()
         }
-        return FileIconMapper.iconName(for: node.name)
-    }
-
-    private func iconColor(for node: WorkspaceTreeNode) -> Color {
-        if node.isDirectory {
-            return .accentColor
-        }
-        return FileIconMapper.iconColor(for: node.name)
     }
 }
 

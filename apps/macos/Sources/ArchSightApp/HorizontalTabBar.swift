@@ -15,9 +15,7 @@ struct HorizontalTabBar: View {
                     let filename = (tab.path as NSString).lastPathComponent
                     
                     HStack(spacing: 6) {
-                        Image(systemName: FileIconMapper.iconName(for: filename))
-                            .foregroundColor(FileIconMapper.iconColor(for: filename))
-                            .font(.system(size: 11))
+                        FileIconMapper.iconType(for: filename).view()
                         
                         Text(filename)
                             .font(.system(size: 11, design: .monospaced))
