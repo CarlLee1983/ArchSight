@@ -108,7 +108,8 @@ final class TextPositionTests: XCTestCase {
 
     func testUTF16OffsetForLineColumnWithMultibyte() {
         let text = "let s = \"é😀\"\nx"
-        // line 2, column 1 is the byte right after the newline -> 'x'
+        // navigates past the surrogate pair to find the newline; line 2,
+        // column 1 is the unit right after the newline -> 'x'
         let offset = TextPosition.utf16Offset(forLine: 2, column: 1, in: text)
         let units = Array(text.utf16)
         XCTAssertEqual(units[offset], UInt16(UnicodeScalar("x").value))
@@ -118,5 +119,14 @@ final class TextPositionTests: XCTestCase {
         let text = "ab\ncd\n"
         // column 99 on line 1 should clamp at the newline (offset 2)
         XCTAssertEqual(TextPosition.utf16Offset(forLine: 1, column: 99, in: text), 2)
+    }
+
+    func testUTF16OffsetRoundTripsThroughSurrogatePair() {
+        let text = "a😀b\nx" // 😀 is a surrogate pair (2 UTF-16 units)
+        for offset in 0...text.utf16.count {
+            let pos = TextPosition.lineColumn(forUTF16Offset: offset, in: text)
+            let back = TextPosition.utf16Offset(forLine: pos.line, column: pos.column, in: text)
+            XCTAssertEqual(back, offset, "round trip failed at offset \(offset)")
+        }
     }
 }
