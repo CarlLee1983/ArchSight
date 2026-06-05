@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Xcode / Swift local state
+DerivedData/
+*.xcuserdata/
+*.xcuserstate
+.build/
+
+# Go build/test artifacts
+bin/
+*.test
+coverage.out
+
+# ArchSight bundled/generated artifacts
+dist/
+build/
+
+# OMX runtime state
+.omx/logs/
+.omx/state/
+.omx/metrics.json
+
+# Keep durable planning artifacts trackable.
+!.omx/
+!.omx/plans/
+!.omx/plans/*.md
