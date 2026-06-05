@@ -11,6 +11,12 @@ struct ContentView: View {
     @State private var history = NavigationHistory()
     @State private var isSplit = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+
+    private enum SidebarTab: String, CaseIterable, Sendable {
+        case explorer
+        case search
+    }
+    @State private var activeSidebarTab: SidebarTab = .explorer
     @State private var comparisonTabID: FileTab.ID?
     @State private var sidebarSelection: WorkspaceEntry.ID?
     @State private var sidebarTreeNodes: [WorkspaceRoot.ID: [WorkspaceTreeNode]] = [:]
@@ -21,12 +27,14 @@ struct ContentView: View {
     @Environment(ReadingPreferencesStore.self) private var readingStore
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            sidebar
-        } content: {
-            middleColumn
-        } detail: {
-            editorPane
+        HStack(spacing: 0) {
+            activityBar
+            Divider()
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                sidebarPanel
+            } detail: {
+                editorPane
+            }
         }
         .toolbar { toolbarContent }
         .background { keyboardShortcuts }
@@ -37,9 +45,7 @@ struct ContentView: View {
             connectCoreIfConfigured()
         }
         .safeAreaInset(edge: .bottom) {
-            if let message = state.errorMessage {
-                statusBanner(message)
-            }
+            statusBar
         }
     }
 
@@ -63,11 +69,6 @@ struct ContentView: View {
                 Label("Split", systemImage: "rectangle.split.2x1")
             }
             .help("Compare two files side by side")
-            TextField("Search", text: $state.searchQuery)
-                .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 180, idealWidth: 260)
-                .onSubmit { runSearch() }
-                .disabled(!canSearch)
             if state.isLoading {
                 ProgressView().controlSize(.small)
             }
@@ -92,8 +93,6 @@ struct ContentView: View {
             }
             .menuStyle(.borderlessButton)
             .help("Layout Style")
-            
-            coreStatusLabel
         }
     }
 
@@ -112,41 +111,155 @@ struct ContentView: View {
         .frame(width: 0, height: 0)
     }
 
-    // MARK: - Sidebar (workspace tree)
+    // MARK: - Sidebar & Activity Bar Views
 
-    private var sidebar: some View {
-        List(selection: $sidebarSelection) {
-            ForEach(state.roots) { root in
-                Section(root.name) {
-                    let nodes = sidebarTreeNodes[root.id, default: []]
-                    if nodes.isEmpty {
-                        Text("No files")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(nodes) { node in
-                            sidebarNode(node)
+    private var activityBar: some View {
+        VStack(spacing: 16) {
+            // Explorer Tab
+            Button { handleTabClick(.explorer) } label: {
+                VStack {
+                    ArchSightIcon.Explorer(color: activeSidebarTab == .explorer ? .accentColor : .secondary)
+                }
+                .frame(width: 36, height: 36)
+                .background(activeSidebarTab == .explorer ? Color.secondary.opacity(0.15) : Color.clear)
+                .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .help("File Explorer")
+            .overlay(alignment: .leading) {
+                if activeSidebarTab == .explorer {
+                    Rectangle()
+                        .fill(Color.accentColor)
+                        .frame(width: 2, height: 20)
+                }
+            }
+            
+            // Search Tab
+            Button { handleTabClick(.search) } label: {
+                VStack {
+                    ArchSightIcon.Search(color: activeSidebarTab == .search ? .accentColor : .secondary)
+                }
+                .frame(width: 36, height: 36)
+                .background(activeSidebarTab == .search ? Color.secondary.opacity(0.15) : Color.clear)
+                .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .help("Search in Workspace")
+            .overlay(alignment: .leading) {
+                if activeSidebarTab == .search {
+                    Rectangle()
+                        .fill(Color.accentColor)
+                        .frame(width: 2, height: 20)
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(.top, 40)
+        .padding(.horizontal, 6)
+        .frame(width: 48)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    @ViewBuilder
+    private var sidebarPanel: some View {
+        VStack(spacing: 0) {
+            switch activeSidebarTab {
+            case .explorer:
+                // Open Files
+                if !state.openTabs.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("OPEN FILES")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.top, 8)
+                            .padding(.bottom, 4)
+                        
+                        List(selection: Binding(
+                            get: { state.selectedTabID },
+                            set: { newValue in
+                                state.selectedTabID = newValue
+                                if let newValue {
+                                    history.visit(newValue)
+                                    pendingScrollLine = nil
+                                }
+                            }
+                        )) {
+                            ForEach(state.openTabs) { tab in
+                                let fileName = (tab.path as NSString).lastPathComponent
+                                HStack {
+                                    FileIconMapper.iconType(for: fileName).view()
+                                    Text(fileName)
+                                        .font(.system(size: 11, design: .monospaced))
+                                    Spacer()
+                                    Button {
+                                        state.closeTab(id: tab.id)
+                                    } label: {
+                                        ArchSightIcon.Close()
+                                            .padding(4)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .tag(tab.id)
+                            }
+                        }
+                        .frame(maxHeight: 150)
+                    }
+                    Divider()
+                }
+                
+                // Folder Tree
+                List(selection: $sidebarSelection) {
+                    ForEach(state.roots) { root in
+                        Section(root.name) {
+                            let nodes = sidebarTreeNodes[root.id, default: []]
+                            if nodes.isEmpty {
+                                Text("No files")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(nodes) { node in
+                                    sidebarNode(node)
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
-        .navigationTitle("Workspace")
-        .onChange(of: sidebarSelection) { _, newSelection in
-            guard let id = newSelection,
-                  let entry = sidebarFileEntriesByID[id]
-            else {
-                return
-            }
-            openEntry(entry)
-        }
-        .onKeyPress(.return) {
-            openSelectedSidebarEntry()
-            return .handled
-        }
-        .overlay {
-            if state.roots.isEmpty {
-                ContentUnavailableView("No Workspace", systemImage: "folder")
+                .navigationTitle("Explorer")
+                .onChange(of: sidebarSelection) { _, newSelection in
+                    guard let id = newSelection,
+                          let entry = sidebarFileEntriesByID[id]
+                    else {
+                        return
+                    }
+                    openEntry(entry)
+                }
+                .onKeyPress(.return) {
+                    openSelectedSidebarEntry()
+                    return .handled
+                }
+                .overlay {
+                    if state.roots.isEmpty {
+                        ContentUnavailableView("No Workspace", systemImage: "folder")
+                    }
+                }
+                
+            case .search:
+                VStack(spacing: 8) {
+                    HStack {
+                        TextField("Search Pattern", text: $state.searchQuery)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { runSearch() }
+                        Button { runSearch() } label: {
+                            Text("Go")
+                        }
+                    }
+                    .padding(8)
+                    
+                    searchResultsList
+                }
+                .navigationTitle("Search")
             }
         }
     }
@@ -159,7 +272,7 @@ struct ContentView: View {
                 }
             } label: {
                 HStack(spacing: 6) {
-                    nodeIconView(for: node)
+                    ArchSightIcon.Folder()
                     Text(node.name)
                         .font(.system(.caption, design: .default))
                 }
@@ -168,7 +281,7 @@ struct ContentView: View {
         } else {
             return AnyView(
                 HStack(spacing: 6) {
-                    nodeIconView(for: node)
+                    FileIconMapper.iconType(for: node.name).view()
                     Text(node.name)
                         .font(.system(.caption, design: .monospaced))
                 }
@@ -176,83 +289,6 @@ struct ContentView: View {
                 .tag(node.entry.id)
                 .contentShape(Rectangle())
             )
-        }
-    }
-
-    // MARK: - Middle column (open files / search results)
-
-    @ViewBuilder
-    private var middleColumn: some View {
-        if state.searchResults.isEmpty {
-            if readingStore.preferences.tabLayoutMode == .horizontalTabs {
-                Color.clear.frame(width: 0)
-            } else {
-                fileList
-            }
-        } else {
-            searchResultsList
-        }
-    }
-
-    private var fileList: some View {
-        // Intercepts only user-driven tab selection so it records history and
-        // resets the scroll target; programmatic selection (open, back/forward,
-        // next/previous) mutates `state.selectedTabID` directly and bypasses this.
-        let manualSelection = Binding<FileTab.ID?>(
-            get: { state.selectedTabID },
-            set: { newValue in
-                state.selectedTabID = newValue
-                if let newValue {
-                    history.visit(newValue)
-                    pendingScrollLine = nil
-                }
-            }
-        )
-        return List(selection: manualSelection) {
-            ForEach(state.openTabs) { tab in
-                let fileName = (tab.path as NSString).lastPathComponent
-                let relativePath = (tab.path as NSString).deletingLastPathComponent
-                
-                HStack(spacing: 10) {
-                    FileIconMapper.iconType(for: fileName).view()
-                        .frame(width: 18)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(fileName)
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .lineLimit(1)
-                        if !relativePath.isEmpty && relativePath != "." {
-                            Text(relativePath)
-                                .font(.system(size: 9))
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    Button {
-                        state.closeTab(id: tab.id)
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 8, weight: .bold))
-                            .padding(4)
-                            .background(Color.secondary.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .help("Close tab")
-                }
-                .padding(.vertical, 4)
-                .tag(tab.id)
-            }
-        }
-        .navigationTitle("Open Files")
-        .overlay {
-            if state.openTabs.isEmpty {
-                ContentUnavailableView("No File", systemImage: "doc.text")
-            }
         }
     }
 
@@ -277,6 +313,59 @@ struct ContentView: View {
         .onKeyPress(.return) {
             openSelectedSearchMatch()
             return .handled
+        }
+    }
+
+    private var statusBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack {
+                HStack(spacing: 4) {
+                    switch coreStatus {
+                    case .disconnected:
+                        ArchSightIcon.StatusIndicator(color: .gray)
+                        Text("Core offline").font(.system(size: 10)).foregroundColor(.secondary)
+                    case .connecting:
+                        ArchSightIcon.StatusIndicator(color: .yellow, pulsing: true)
+                        Text("Core connecting").font(.system(size: 10)).foregroundColor(.secondary)
+                    case .connected(let health):
+                        ArchSightIcon.StatusIndicator(color: .green)
+                        Text("Core \(health.version)").font(.system(size: 10)).foregroundColor(.secondary)
+                    case .failed:
+                        ArchSightIcon.StatusIndicator(color: .red)
+                        Text("Core unavailable").font(.system(size: 10)).foregroundColor(.secondary)
+                    }
+                }
+                
+                if let message = state.errorMessage {
+                    Spacer()
+                    Text(message)
+                        .font(.system(size: 10))
+                        .foregroundColor(.red)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                if let tab = selectedTab {
+                    Text(tab.path)
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 22)
+            .background(Color(NSColor.windowBackgroundColor))
+        }
+    }
+
+    private func handleTabClick(_ tab: SidebarTab) {
+        if activeSidebarTab == tab {
+            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+        } else {
+            activeSidebarTab = tab
+            columnVisibility = .all
         }
     }
 
@@ -445,34 +534,7 @@ struct ContentView: View {
         state.openTabs.first { $0.id == comparisonTabID }
     }
 
-    private var canSearch: Bool {
-        coreEndpoint != nil && state.workspaceId != nil
-    }
 
-    private var coreStatusLabel: some View {
-        Group {
-            switch coreStatus {
-            case .disconnected:
-                StatusPill(text: "Core offline", color: .gray, pulsing: false)
-            case .connecting:
-                StatusPill(text: "Core connecting", color: .yellow, pulsing: true)
-            case .connected(let health):
-                StatusPill(text: "Core \(health.version)", color: .green, pulsing: false)
-            case .failed:
-                StatusPill(text: "Core unavailable", color: .red, pulsing: false)
-            }
-        }
-    }
-
-    private func statusBanner(_ message: String) -> some View {
-        Text(message)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.bar)
-    }
 
     // MARK: - Core lifecycle
 
@@ -755,14 +817,7 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder @MainActor
-    private func nodeIconView(for node: WorkspaceTreeNode) -> some View {
-        if node.isDirectory {
-            CustomIconType.folder.view()
-        } else {
-            FileIconMapper.iconType(for: node.name).view()
-        }
-    }
+
 }
 
 private enum MarkdownDisplayMode {
