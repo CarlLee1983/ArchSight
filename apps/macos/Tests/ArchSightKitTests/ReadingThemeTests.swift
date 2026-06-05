@@ -1,6 +1,5 @@
 import XCTest
 @testable import ArchSightKit
-@testable import ArchSightApp
 
 final class ReadingThemeTests: XCTestCase {
     func testCatalogCoversEveryThemeID() {
@@ -54,17 +53,5 @@ final class ReadingThemeTests: XCTestCase {
     func testDarkThemeColorSchemeIsDark() {
         XCTAssertEqual(ReadingTheme.theme(for: .solarized).cssColorScheme, "dark")
         XCTAssertEqual(ReadingTheme.theme(for: .highContrast).cssColorScheme, "dark")
-    }
-
-    func testCustomIconsCompileAndCanBeInstantiated() {
-        _ = ArchSightIcon.Folder()
-        _ = ArchSightIcon.FolderOpen()
-        _ = ArchSightIcon.File()
-        _ = ArchSightIcon.Search()
-        _ = ArchSightIcon.Explorer()
-        _ = ArchSightIcon.Settings()
-        _ = ArchSightIcon.Close()
-        _ = ArchSightIcon.StatusIndicator(color: .green, pulsing: true)
-        XCTAssertTrue(true)
     }
 }

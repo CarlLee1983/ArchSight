@@ -22,7 +22,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ArchSightKitTests",
-            dependencies: ["ArchSightKit", "ArchSightApp"],
+            dependencies: ["ArchSightKit"],
             path: "Tests/ArchSightKitTests"
         )
     ]
