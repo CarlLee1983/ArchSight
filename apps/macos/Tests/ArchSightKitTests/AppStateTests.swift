@@ -158,4 +158,93 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(tree.map(\.name), [".omx", "apps", "core", ".gitignore", "AGENTS.md", "README.md"])
         XCTAssertEqual(tree.map(\.isDirectory), [true, true, true, false, false, false])
     }
+
+    func testRemoveRootDropsRootEntriesAndItsTabs() {
+        var state = WorkspaceViewState(
+            workspaceId: "ws_1",
+            roots: [
+                WorkspaceRoot(id: "root_1", name: "a", path: "/tmp/a"),
+                WorkspaceRoot(id: "root_2", name: "b", path: "/tmp/b"),
+            ],
+            entries: [
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/a", path: "a.txt", name: "a.txt", kind: "file"),
+                WorkspaceEntry(rootId: "root_2", rootPath: "/tmp/b", path: "b.txt", name: "b.txt", kind: "file"),
+            ]
+        )
+        state.openFile(rootID: "root_1", path: "a.txt", content: "a")
+        state.openFile(rootID: "root_2", path: "b.txt", content: "b")
+        // selectedTabID is now root_2:b.txt
+
+        state.removeRoot(id: "root_1")
+
+        XCTAssertEqual(state.roots.map(\.id), ["root_2"])
+        XCTAssertTrue(state.entries.allSatisfy { $0.rootId == "root_2" })
+        XCTAssertEqual(state.openTabs.map(\.rootID), ["root_2"])
+        XCTAssertEqual(state.selectedTabID, "root_2:b.txt")
+    }
+
+    func testRemoveRootClearsSelectionWhenSelectedTabRemoved() {
+        var state = WorkspaceViewState(
+            workspaceId: "ws_1",
+            roots: [WorkspaceRoot(id: "root_1", name: "a", path: "/tmp/a")],
+            entries: []
+        )
+        state.openFile(rootID: "root_1", path: "a.txt", content: "a")
+        state.removeRoot(id: "root_1")
+        XCTAssertTrue(state.openTabs.isEmpty)
+        XCTAssertNil(state.selectedTabID)
+    }
+
+    func testRemoveRootRepairsSelectionToSurvivingTab() {
+        var state = WorkspaceViewState(
+            workspaceId: "ws_1",
+            roots: [
+                WorkspaceRoot(id: "root_1", name: "a", path: "/tmp/a"),
+                WorkspaceRoot(id: "root_2", name: "b", path: "/tmp/b"),
+            ],
+            entries: []
+        )
+        state.openFile(rootID: "root_1", path: "f.txt", content: "")
+        state.openFile(rootID: "root_2", path: "g.txt", content: "")
+        state.selectedTabID = "root_1:f.txt"   // select the tab about to be removed
+
+        state.removeRoot(id: "root_1")
+
+        XCTAssertEqual(state.selectedTabID, "root_2:g.txt")
+    }
+
+    func testCloseWorkspaceClearsEverythingButKeepsWorkspaceId() {
+        let searchMatch = try! JSONDecoder().decode(SearchMatch.self, from: """
+        {"rootId":"root_1","rootPath":"/tmp/a","path":"a.txt","line":1,"column":1,"preview":"hit","ranges":[]}
+        """.data(using: .utf8)!)
+        var state = WorkspaceViewState(
+            workspaceId: "ws_1",
+            roots: [WorkspaceRoot(id: "root_1", name: "a", path: "/tmp/a")],
+            entries: [WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/a", path: "a.txt", name: "a.txt", kind: "file")]
+        )
+        state.openFile(rootID: "root_1", path: "a.txt", content: "a")
+        state.searchQuery = "todo"
+        state.searchResults = [searchMatch]
+        state.references = [
+            Location(rootId: "root_1", rootPath: "/tmp/a", path: "a.txt",
+                     startLine: 1, startColumn: 1, endLine: 1, endColumn: 4)
+        ]
+        state.referencesContext = "a.txt:1"
+        state.isLoading = true
+        state.errorMessage = "boom"
+
+        state.closeWorkspace()
+
+        XCTAssertEqual(state.workspaceId, "ws_1")
+        XCTAssertTrue(state.roots.isEmpty)
+        XCTAssertTrue(state.entries.isEmpty)
+        XCTAssertTrue(state.openTabs.isEmpty)
+        XCTAssertNil(state.selectedTabID)
+        XCTAssertEqual(state.searchQuery, "")
+        XCTAssertTrue(state.searchResults.isEmpty)
+        XCTAssertTrue(state.references.isEmpty)
+        XCTAssertNil(state.referencesContext)
+        XCTAssertFalse(state.isLoading)
+        XCTAssertNil(state.errorMessage)
+    }
 }

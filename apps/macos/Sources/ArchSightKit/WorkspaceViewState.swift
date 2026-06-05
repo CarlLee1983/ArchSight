@@ -139,6 +139,36 @@ public struct WorkspaceViewState: Equatable, Sendable {
         }
     }
 
+    /// Removes a single root: drops its roots/entries, closes every tab that
+    /// belongs to it (fixing selection), and clears references pointing at it.
+    public mutating func removeRoot(id: String) {
+        roots.removeAll { $0.id == id }
+        entries.removeAll { $0.rootId == id }
+        for tab in openTabs where tab.rootID == id {
+            closeTab(id: tab.id)
+        }
+        references.removeAll { $0.rootId == id }
+        // TODO: referencesContext is per-query, not per-root — only cleared when all references are gone.
+        if references.isEmpty {
+            referencesContext = nil
+        }
+    }
+
+    /// Empties the workspace back to a blank state while keeping the same
+    /// workspaceId so new roots can still be added to it.
+    public mutating func closeWorkspace() {
+        roots = []
+        entries = []
+        openTabs = []
+        selectedTabID = nil
+        searchQuery = ""
+        searchResults = []
+        references = []
+        referencesContext = nil
+        isLoading = false
+        errorMessage = nil
+    }
+
     public mutating func selectNextTab() {
         moveSelection(by: 1)
     }
