@@ -11,7 +11,7 @@ struct ReadingControlsView: View {
         HStack(spacing: 10) {
             Picker("Theme", selection: themeBinding) {
                 ForEach(ReadingThemeID.allCases, id: \.self) { id in
-                    Text(label(for: id)).tag(id)
+                    Text(id.displayName).tag(id)
                 }
             }
             .labelsHidden()
@@ -47,12 +47,4 @@ struct ReadingControlsView: View {
         Binding(get: { store.preferences.lineSpacing }, set: { store.setLineSpacing($0) })
     }
 
-    private func label(for id: ReadingThemeID) -> String {
-        switch id {
-        case .system: return "System"
-        case .github: return "GitHub"
-        case .solarized: return "Solarized"
-        case .highContrast: return "High Contrast"
-        }
-    }
 }

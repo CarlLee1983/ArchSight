@@ -51,4 +51,11 @@ final class ReadingPreferencesTests: XCTestCase {
         let decoded = try JSONDecoder().decode(ReadingPreferences.self, from: data)
         XCTAssertEqual(decoded, prefs)
     }
+
+    func testThemeDisplayNames() {
+        XCTAssertEqual(ReadingThemeID.system.displayName, "System")
+        XCTAssertEqual(ReadingThemeID.github.displayName, "GitHub")
+        XCTAssertEqual(ReadingThemeID.solarized.displayName, "Solarized")
+        XCTAssertEqual(ReadingThemeID.highContrast.displayName, "High Contrast")
+    }
 }

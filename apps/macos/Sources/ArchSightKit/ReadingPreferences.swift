@@ -5,6 +5,16 @@ public enum ReadingThemeID: String, CaseIterable, Codable, Sendable {
     case github
     case solarized
     case highContrast
+
+    /// Human-readable label for pickers and settings.
+    public var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .github: return "GitHub"
+        case .solarized: return "Solarized"
+        case .highContrast: return "High Contrast"
+        }
+    }
 }
 
 public enum LineSpacing: String, CaseIterable, Codable, Sendable {
