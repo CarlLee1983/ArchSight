@@ -181,6 +181,54 @@ func listAllPaths(t *testing.T, root string) []string {
 	return paths
 }
 
+func TestAddRootsAppendsOnlyNewRootsWithContinuingIDs(t *testing.T) {
+	dirA := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dirA, "a.txt"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dirB := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dirB, "b.txt"), []byte("b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manager := NewManager()
+
+	opened, err := manager.Open(context.Background(), []string{dirA})
+	if err != nil {
+		t.Fatalf("Open error: %v", err)
+	}
+	waitForSnapshot(t, manager, opened.ID)
+
+	added, err := manager.AddRoots(context.Background(), opened.ID, []string{dirB})
+	if err != nil {
+		t.Fatalf("AddRoots error: %v", err)
+	}
+	if len(added.Roots) != 2 {
+		t.Fatalf("expected 2 roots, got %d", len(added.Roots))
+	}
+	if added.Roots[1].ID != "root_2" {
+		t.Fatalf("expected continuing id root_2, got %s", added.Roots[1].ID)
+	}
+	waitForSnapshot(t, manager, opened.ID)
+
+	got, _ := manager.Get(opened.ID)
+	var roots []string
+	for _, e := range got.Entries {
+		if e.Kind == KindFile {
+			roots = append(roots, e.RootID+"/"+e.Path)
+		}
+	}
+	if len(roots) != 2 {
+		t.Fatalf("expected entries from both roots, got %v", roots)
+	}
+}
+
+func TestAddRootsUnknownWorkspaceErrors(t *testing.T) {
+	manager := NewManager()
+	if _, err := manager.AddRoots(context.Background(), "ws_missing", []string{t.TempDir()}); err == nil {
+		t.Fatal("expected error for unknown workspace")
+	}
+}
+
 func TestOpenAssignsSequentialRootIDsFromOne(t *testing.T) {
 	dirA := t.TempDir()
 	dirB := t.TempDir()

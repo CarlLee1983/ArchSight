@@ -86,11 +86,88 @@ func (m *Manager) Open(parent context.Context, rootPaths []string) (Snapshot, er
 	m.mu.Lock()
 	m.snapshots[id] = snapshot
 	m.cancels[id] = cancel
+	clone := cloneSnapshot(snapshot)
 	m.mu.Unlock()
 
 	go m.scan(ctx, id, roots)
 
-	return cloneSnapshot(snapshot), nil
+	return clone, nil
+}
+
+// AddRoots appends new roots to an existing workspace and scans only those new
+// roots, merging their entries into the snapshot. Existing root ids are never
+// renumbered or reused.
+func (m *Manager) AddRoots(parent context.Context, id string, rootPaths []string) (Snapshot, error) {
+	m.mu.Lock()
+	snapshot, ok := m.snapshots[id]
+	if !ok {
+		m.mu.Unlock()
+		return Snapshot{}, fmt.Errorf("workspace not found: %s", id)
+	}
+	newRoots, nextSeq, err := buildRootsFrom(rootPaths, snapshot.nextRootSeq)
+	if err != nil {
+		m.mu.Unlock()
+		return Snapshot{}, err
+	}
+	// New roots and nextRootSeq are staged optimistically under the lock; we do
+	// not roll them back if the append scan fails. This is safe because AddRoots
+	// is expected to be called on a settled (ready) workspace — the Swift
+	// controller guarantees this via awaitReady before invoking AddRoots.
+	snapshot.Roots = append(snapshot.Roots, newRoots...)
+	snapshot.nextRootSeq = nextSeq
+	snapshot.Status = StatusScanning
+	snapshot.Error = ""
+	ctx, cancel := context.WithCancel(parent)
+	if old := m.cancels[id]; old != nil {
+		old()
+	}
+	m.cancels[id] = cancel
+	clone := cloneSnapshot(snapshot)
+	m.mu.Unlock()
+
+	go m.scanAppend(ctx, id, newRoots)
+	return clone, nil
+}
+
+func (m *Manager) scanAppend(ctx context.Context, id string, roots []Root) {
+	var newEntries []Entry
+	for _, root := range roots {
+		if err := m.scanRoot(ctx, root, &newEntries); err != nil {
+			m.finishAppend(id, err, newEntries)
+			return
+		}
+	}
+	m.finishAppend(id, nil, newEntries)
+}
+
+func (m *Manager) finishAppend(id string, err error, newEntries []Entry) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	snapshot, ok := m.snapshots[id]
+	if !ok {
+		return
+	}
+	// On cancel/fail we deliberately merge no partial entries, by design:
+	// keeping the existing good entries untouched avoids corrupting the
+	// snapshot with a half-scanned new root.
+	switch {
+	case errors.Is(err, context.Canceled):
+		snapshot.Status = StatusCanceled
+	case err != nil:
+		snapshot.Status = StatusFailed
+		snapshot.Error = err.Error()
+	default:
+		snapshot.Entries = append(snapshot.Entries, newEntries...)
+		slices.SortFunc(snapshot.Entries, func(a, b Entry) int {
+			if a.RootID != b.RootID {
+				return strings.Compare(a.RootID, b.RootID)
+			}
+			return strings.Compare(a.Path, b.Path)
+		})
+		snapshot.Status = StatusReady
+	}
+	delete(m.cancels, id)
 }
 
 func (m *Manager) Get(id string) (Snapshot, bool) {
@@ -141,7 +218,9 @@ func (m *Manager) finish(id string, err error, entries []Entry) {
 	if !ok {
 		return
 	}
-	snapshot.Entries = slices.Clone(entries)
+	// On cancel/fail we leave entries untouched (symmetric with finishAppend):
+	// only a successful scan commits its entries, so a canceled/failed scan
+	// never wipes an otherwise-good snapshot.
 	switch {
 	case errors.Is(err, context.Canceled):
 		snapshot.Status = StatusCanceled
@@ -149,6 +228,7 @@ func (m *Manager) finish(id string, err error, entries []Entry) {
 		snapshot.Status = StatusFailed
 		snapshot.Error = err.Error()
 	default:
+		snapshot.Entries = slices.Clone(entries)
 		snapshot.Status = StatusReady
 	}
 	delete(m.cancels, id)
