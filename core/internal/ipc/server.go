@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/cmg/archsight/core/internal/search"
 	"github.com/cmg/archsight/core/internal/workspace"
 )
 
@@ -18,14 +19,18 @@ type Config struct {
 	SocketPath       string
 	Version          string
 	WorkspaceManager *workspace.Manager
+	Searcher         search.Searcher
 }
 
 type Server struct {
 	config     Config
 	workspaces *workspace.Manager
+	searcher   search.Searcher
 	listener   net.Listener
 	done       chan struct{}
 	once       sync.Once
+	activeMu   sync.Mutex
+	active     map[string]context.CancelFunc
 }
 
 type HealthResult struct {
@@ -38,10 +43,16 @@ func NewServer(config Config) *Server {
 	if manager == nil {
 		manager = workspace.NewManager()
 	}
+	searcher := config.Searcher
+	if searcher == nil {
+		searcher = search.NewRipgrepSearcher(search.Options{})
+	}
 	return &Server{
 		config:     config,
 		workspaces: manager,
+		searcher:   searcher,
 		done:       make(chan struct{}),
+		active:     make(map[string]context.CancelFunc),
 	}
 }
 
@@ -119,6 +130,8 @@ func (s *Server) dispatch(req Request) Response {
 		return s.openWorkspace(req)
 	case "listTree":
 		return s.listTree(req)
+	case "search":
+		return s.search(req)
 	case "cancel":
 		return s.cancel(req)
 	default:
@@ -151,6 +164,15 @@ type listTreeResult struct {
 type cancelParams struct {
 	TargetID    string `json:"targetId"`
 	WorkspaceID string `json:"workspaceId"`
+}
+
+type searchParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	Pattern     string `json:"pattern"`
+}
+
+type searchResult struct {
+	Matches []search.Match `json:"matches"`
 }
 
 func (s *Server) openWorkspace(req Request) Response {
@@ -199,10 +221,77 @@ func (s *Server) cancel(req Request) Response {
 	if targetID == "" {
 		return ErrorResponse(req.ID, NewError("invalid_params", "targetId or workspaceId is required"))
 	}
+	if s.cancelActive(targetID) {
+		return SuccessResponse(req.ID, map[string]any{"canceled": true})
+	}
 	if !s.workspaces.Cancel(targetID) {
 		return ErrorResponse(req.ID, NewError("not_found", "Cancelable work not found: "+targetID))
 	}
 	return SuccessResponse(req.ID, map[string]any{"canceled": true})
+}
+
+func (s *Server) search(req Request) Response {
+	var params searchParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return ErrorResponse(req.ID, NewError("invalid_params", err.Error()))
+	}
+	snapshot, ok := s.workspaces.Get(params.WorkspaceID)
+	if !ok {
+		return ErrorResponse(req.ID, NewError("not_found", "Workspace not found: "+params.WorkspaceID))
+	}
+	if snapshot.Status != workspace.StatusReady {
+		return ErrorResponse(req.ID, NewError("workspace_not_ready", "Workspace is not ready: "+params.WorkspaceID))
+	}
+
+	var matches []search.Match
+	ctx, cancel := context.WithCancel(context.Background())
+	s.trackActive(req.ID, cancel)
+	defer s.untrackActive(req.ID)
+
+	err := s.searcher.Search(ctx, search.Request{
+		Pattern: params.Pattern,
+		Roots:   snapshot.Roots,
+	}, func(match search.Match) error {
+		matches = append(matches, match)
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return ErrorResponse(req.ID, NewError("context_canceled", "Request canceled"))
+		}
+		var searchErr *search.Error
+		if search.AsError(err, &searchErr) {
+			return ErrorResponse(req.ID, NewError(searchErr.Code, searchErr.Message))
+		}
+		return ErrorResponse(req.ID, err)
+	}
+	return SuccessResponse(req.ID, searchResult{Matches: matches})
+}
+
+func (s *Server) trackActive(id string, cancel context.CancelFunc) {
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+
+	s.active[id] = cancel
+}
+
+func (s *Server) untrackActive(id string) {
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+
+	delete(s.active, id)
+}
+
+func (s *Server) cancelActive(id string) bool {
+	s.activeMu.Lock()
+	cancel, ok := s.active[id]
+	s.activeMu.Unlock()
+	if !ok {
+		return false
+	}
+
+	cancel()
+	return true
 }
 
 func writeResponse(w io.Writer, resp Response) error {

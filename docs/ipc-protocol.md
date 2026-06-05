@@ -99,6 +99,45 @@ The result includes the snapshot ID and preserved root identities:
 
 During Phase 2, `cancel` accepts a workspace scan ID through `targetId` or `workspaceId`.
 
+## Search Method
+
+`search` runs `ripgrep` against the roots of a ready workspace snapshot:
+
+```json
+{
+  "id": "req_search",
+  "method": "search",
+  "params": {
+    "workspaceId": "ws_1",
+    "pattern": "needle"
+  }
+}
+```
+
+The result shape is ready for streaming even while Phase 3 returns a final aggregate response:
+
+```json
+{
+  "id": "req_search",
+  "ok": true,
+  "result": {
+    "matches": [
+      {
+        "rootId": "root_1",
+        "rootPath": "/Users/alex/Code/service-a",
+        "path": "cmd/main.go",
+        "line": 12,
+        "column": 8,
+        "preview": "fmt.Println(\"needle\")",
+        "ranges": [{"start": 12, "end": 18}]
+      }
+    ]
+  }
+}
+```
+
+`search` requires a ready workspace. Invalid patterns return `invalid_pattern`. Active searches can be canceled with `cancel` using the search request ID as `targetId`.
+
 ## Streaming
 
 Long-running requests may emit events before a final response:

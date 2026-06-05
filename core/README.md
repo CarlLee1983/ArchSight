@@ -23,6 +23,14 @@ Snapshot entries are flattened for UI presentation, but every entry carries `roo
 
 Workspace scanning does not write cache files, databases, indexes, or metadata into opened roots.
 
+## Phase 3 Search
+
+The core search backend shells out to `ripgrep` with JSON output and parses match events into ArchSight result objects. Matches include root identity, relative path, line, column, preview text, and match ranges.
+
+Search runs only against roots from a ready workspace snapshot. The command excludes the same heavyweight directories used by workspace scanning, including nested `.git`, `node_modules`, `build`, `.next`, `DerivedData`, `vendor`, and `.cache` folders.
+
+Search cancellation uses request IDs: send `cancel` with the active `search` request ID as `targetId` to cancel the underlying context and terminate `rg`.
+
 Run core verification from the repository root:
 
 ```sh

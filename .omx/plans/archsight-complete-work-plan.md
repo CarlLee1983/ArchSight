@@ -150,6 +150,14 @@ Acceptance criteria:
 
 Integrate `ripgrep` as the full-text search backend.
 
+Implementation status:
+
+- Added a `ripgrep --json` search backend under `core/internal/search`.
+- Search results include `rootId`, `rootPath`, relative path, line, column, preview text, and match ranges.
+- IPC `search` runs against ready workspace snapshots and maps invalid regex patterns to structured `invalid_pattern` errors.
+- Active search requests can be canceled through `cancel targetId=<search request id>`.
+- Tests cover command construction, ignored directories, invalid patterns, cancellation, root identity, and IPC search behavior.
+
 Tasks:
 
 - Detect bundled `rg` first, then system `rg` as a development fallback.
