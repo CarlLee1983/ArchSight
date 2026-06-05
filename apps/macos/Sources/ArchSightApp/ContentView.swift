@@ -12,7 +12,7 @@ struct ContentView: View {
 
     @State private var history = NavigationHistory()
     @State private var isSplit = false
-    @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @State private var isSidebarVisible = true
 
     private enum SidebarTab: String, CaseIterable, Sendable {
         case explorer
@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var sidebarSelection: WorkspaceEntry.ID?
     @State private var sidebarTreeNodes: [WorkspaceRoot.ID: [WorkspaceTreeNode]] = [:]
     @State private var sidebarFileEntriesByID: [WorkspaceEntry.ID: WorkspaceEntry] = [:]
+    @State private var hoveredOpenTabID: FileTab.ID?
     @State private var searchSelection: SearchMatch.ID?
     @State private var pendingScrollLine: Int?
     @State private var markdownDisplayMode: MarkdownDisplayMode = .preview
@@ -31,14 +32,17 @@ struct ContentView: View {
     var body: some View {
         HStack(spacing: 0) {
             activityBar
-            Divider()
-            NavigationSplitView(columnVisibility: $columnVisibility) {
+            Divider().opacity(0.55)
+            if isSidebarVisible {
                 sidebarPanel
-            } detail: {
-                editorPane
+                    .frame(width: 268)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                Divider().opacity(0.55)
             }
+            editorPane
         }
         .toolbar { toolbarContent }
+        .background(Color(NSColor.textBackgroundColor))
         .background { keyboardShortcuts }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: nil) { providers in
             handleDroppedFolders(providers)
@@ -160,7 +164,7 @@ struct ContentView: View {
         .padding(.top, 8)
         .padding(.horizontal, 6)
         .frame(width: 48)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(Color(NSColor.controlBackgroundColor))
     }
 
     @ViewBuilder
@@ -168,50 +172,10 @@ struct ContentView: View {
         VStack(spacing: 0) {
             switch activeSidebarTab {
             case .explorer:
-                // Open Files
                 if !state.openTabs.isEmpty {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("OPEN FILES")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.top, 8)
-                            .padding(.bottom, 4)
-                        
-                        List(selection: Binding(
-                            get: { state.selectedTabID },
-                            set: { newValue in
-                                state.selectedTabID = newValue
-                                if let newValue {
-                                    history.visit(newValue)
-                                    pendingScrollLine = nil
-                                }
-                            }
-                        )) {
-                            ForEach(state.openTabs) { tab in
-                                let fileName = (tab.path as NSString).lastPathComponent
-                                HStack {
-                                    FileIconMapper.iconType(for: fileName).view()
-                                    Text(fileName)
-                                        .font(.system(size: 11, design: .monospaced))
-                                    Spacer()
-                                    Button {
-                                        state.closeTab(id: tab.id)
-                                    } label: {
-                                        ArchSightIcon.Close()
-                                            .padding(4)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .tag(tab.id)
-                            }
-                        }
-                        .frame(maxHeight: 150)
-                    }
-                    Divider()
+                    openFilesPanel
                 }
                 
-                // Folder Tree
                 List(selection: $sidebarSelection) {
                     ForEach(state.roots) { root in
                         Section(root.name) {
@@ -228,7 +192,8 @@ struct ContentView: View {
                         }
                     }
                 }
-                .navigationTitle("Explorer")
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
                 .onChange(of: sidebarSelection) { _, newSelection in
                     guard let id = newSelection,
                           let entry = sidebarFileEntriesByID[id]
@@ -261,8 +226,77 @@ struct ContentView: View {
                     
                     searchResultsList
                 }
-                .navigationTitle("Search")
             }
+        }
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    private var openFilesPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("OPEN FILES")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(state.openTabs) { tab in
+                        openFileRow(tab)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
+            }
+            .frame(maxHeight: 154)
+
+            Divider().opacity(0.6)
+        }
+    }
+
+    private func openFileRow(_ tab: FileTab) -> some View {
+        let fileName = (tab.path as NSString).lastPathComponent
+        let isSelected = state.selectedTabID == tab.id
+        let isHovered = hoveredOpenTabID == tab.id
+
+        return HStack(spacing: 8) {
+            FileIconMapper.iconType(for: fileName).view()
+            Text(fileName)
+                .font(.system(size: 11, design: .monospaced))
+                .fontWeight(isSelected ? .semibold : .regular)
+                .foregroundColor(isSelected ? .primary : .secondary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Button {
+                state.closeTab(id: tab.id)
+                if hoveredOpenTabID == tab.id {
+                    hoveredOpenTabID = nil
+                }
+            } label: {
+                ArchSightIcon.Close(color: isSelected ? .primary : .secondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(isHovered ? Color.secondary.opacity(0.16) : Color.clear)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help("Close")
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 30)
+        .background(isSelected ? Color.accentColor.opacity(0.16) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .contentShape(Rectangle())
+        .onHover { isHovering in
+            hoveredOpenTabID = isHovering ? tab.id : nil
+        }
+        .onTapGesture {
+            state.selectedTabID = tab.id
+            history.visit(tab.id)
+            pendingScrollLine = nil
         }
     }
 
@@ -326,7 +360,8 @@ struct ContentView: View {
                 }
             }
         }
-        .navigationTitle("Search")
+        .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
         .onKeyPress(.return) {
             openSelectedSearchMatch()
             return .handled
@@ -379,10 +414,14 @@ struct ContentView: View {
 
     private func handleTabClick(_ tab: SidebarTab) {
         if activeSidebarTab == tab {
-            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+            withAnimation(.easeInOut(duration: 0.16)) {
+                isSidebarVisible.toggle()
+            }
         } else {
             activeSidebarTab = tab
-            columnVisibility = .all
+            withAnimation(.easeInOut(duration: 0.16)) {
+                isSidebarVisible = true
+            }
         }
     }
 
@@ -417,7 +456,10 @@ struct ContentView: View {
                     primaryPane
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(NSColor.textBackgroundColor))
         .safeAreaInset(edge: .bottom) { referencesPanel }
     }
 
@@ -425,9 +467,9 @@ struct ContentView: View {
     private var primaryPane: some View {
         if let tab = selectedTab {
             filePane(for: tab, scrollLine: pendingScrollLine)
-                .navigationTitle(tab.path)
         } else {
             ContentUnavailableView("Read Only", systemImage: "eye")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -845,4 +887,3 @@ private enum MarkdownDisplayMode {
     case preview
     case source
 }
-
