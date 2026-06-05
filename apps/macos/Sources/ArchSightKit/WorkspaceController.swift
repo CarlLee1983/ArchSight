@@ -43,7 +43,7 @@ public final class WorkspaceController {
     /// Loads a single file's read-only content as a tab.
     public func loadFile(workspaceId: String, rootId: String, path: String) throws -> FileTab {
         let file = try client.openFile(workspaceId: workspaceId, rootId: rootId, path: path)
-        return FileTab(rootID: file.rootId, path: file.path, content: file.content)
+        return FileTab(rootID: file.rootId, path: file.path, content: file.content, tokens: file.tokens)
     }
 
     /// Runs a full-text search and returns the accumulated matches.

@@ -97,4 +97,14 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(state.selectedTabID, "r:b")
     }
+
+    func testOpenFileCarriesTokens() {
+        let json = """
+        {"startLine":1,"startColumn":1,"endLine":1,"endColumn":5,"type":"keyword"}
+        """.data(using: .utf8)!
+        let token = try! JSONDecoder().decode(SyntaxToken.self, from: json)
+        var state = WorkspaceViewState()
+        state.openFile(rootID: "r", path: "main.go", content: "func x() {}", tokens: [token])
+        XCTAssertEqual(state.openTabs.first?.tokens, [token])
+    }
 }

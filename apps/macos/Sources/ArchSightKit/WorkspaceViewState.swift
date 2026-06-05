@@ -51,8 +51,8 @@ public struct WorkspaceViewState: Equatable, Sendable {
         entries.filter { !$0.isDirectory }
     }
 
-    public mutating func openFile(rootID: String, path: String, content: String) {
-        let tab = FileTab(rootID: rootID, path: path, content: content)
+    public mutating func openFile(rootID: String, path: String, content: String, tokens: [SyntaxToken] = []) {
+        let tab = FileTab(rootID: rootID, path: path, content: content, tokens: tokens)
         if let existing = openTabs.firstIndex(where: { $0.id == tab.id }) {
             openTabs[existing] = tab
         } else {
@@ -110,13 +110,15 @@ public struct FileTab: Equatable, Identifiable, Sendable {
     public let rootID: String
     public let path: String
     public let content: String
+    public let tokens: [SyntaxToken]
     public let isReadOnly: Bool
 
-    public init(rootID: String, path: String, content: String, isReadOnly: Bool = true) {
+    public init(rootID: String, path: String, content: String, tokens: [SyntaxToken] = [], isReadOnly: Bool = true) {
         self.id = rootID + ":" + path
         self.rootID = rootID
         self.path = path
         self.content = content
+        self.tokens = tokens
         self.isReadOnly = isReadOnly
     }
 }
