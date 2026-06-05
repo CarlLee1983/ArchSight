@@ -12,11 +12,11 @@ struct HorizontalTabBar: View {
             HStack(spacing: 0) {
                 ForEach(openTabs) { tab in
                     let isSelected = selectedTabID == tab.id
-                    let filename = URL(fileURLWithPath: tab.path).lastPathComponent
+                    let filename = (tab.path as NSString).lastPathComponent
                     
                     HStack(spacing: 6) {
-                        Image(systemName: fileIconName(for: filename))
-                            .foregroundColor(fileIconColor(for: filename))
+                        Image(systemName: FileIconMapper.iconName(for: filename))
+                            .foregroundColor(FileIconMapper.iconColor(for: filename))
                             .font(.system(size: 11))
                         
                         Text(filename)
@@ -67,35 +67,5 @@ struct HorizontalTabBar: View {
                 Divider()
             }
         )
-    }
-
-    private func fileIconName(for filename: String) -> String {
-        let lowercased = filename.lowercased()
-        if lowercased == "package.swift" || lowercased == "go.mod" || lowercased.hasSuffix(".json") || lowercased.hasSuffix(".yaml") || lowercased.hasSuffix(".yml") {
-            return "doc.text.fill"
-        }
-        if lowercased.hasSuffix(".swift") {
-            return "swift"
-        } else if lowercased.hasSuffix(".md") || lowercased.hasSuffix(".markdown") {
-            return "doc.richtext"
-        } else {
-            return "doc.text"
-        }
-    }
-
-    private func fileIconColor(for filename: String) -> Color {
-        let lowercased = filename.lowercased()
-        if lowercased == "package.swift" || lowercased == "go.mod" {
-            return .purple
-        }
-        if lowercased.hasSuffix(".swift") {
-            return .orange
-        } else if lowercased.hasSuffix(".md") || lowercased.hasSuffix(".markdown") {
-            return .blue
-        } else if lowercased.hasSuffix(".json") || lowercased.hasSuffix(".yaml") || lowercased.hasSuffix(".yml") {
-            return .pink
-        } else {
-            return .secondary
-        }
     }
 }

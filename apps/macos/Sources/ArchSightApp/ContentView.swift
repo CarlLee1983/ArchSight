@@ -10,6 +10,7 @@ struct ContentView: View {
 
     @State private var history = NavigationHistory()
     @State private var isSplit = false
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var comparisonTabID: FileTab.ID?
     @State private var sidebarSelection: WorkspaceEntry.ID?
     @State private var sidebarTreeNodes: [WorkspaceRoot.ID: [WorkspaceTreeNode]] = [:]
@@ -20,7 +21,7 @@ struct ContentView: View {
     @Environment(ReadingPreferencesStore.self) private var readingStore
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } content: {
             middleColumn
@@ -70,6 +71,28 @@ struct ContentView: View {
             if state.isLoading {
                 ProgressView().controlSize(.small)
             }
+            SettingsLink {
+                Image(systemName: "gearshape")
+            }
+            .accessibilityLabel("Reading Settings")
+            .help("Reading settings (theme, text size, line spacing)")
+            
+            Menu {
+                Picker("Layout Style", selection: Binding(
+                    get: { readingStore.preferences.tabLayoutMode },
+                    set: { readingStore.setTabLayoutMode($0) }
+                )) {
+                    ForEach(TabLayoutMode.allCases, id: \.self) { mode in
+                        Label(mode.displayName, systemImage: systemImage(for: mode))
+                            .tag(mode)
+                    }
+                }
+            } label: {
+                Image(systemName: systemImage(for: readingStore.preferences.tabLayoutMode))
+            }
+            .menuStyle(.borderlessButton)
+            .help("Layout Style")
+            
             coreStatusLabel
         }
     }
@@ -135,16 +158,28 @@ struct ContentView: View {
                     sidebarNode(child)
                 }
             } label: {
-                Label(node.name, systemImage: "folder")
-                    .font(.system(.caption, design: .default))
-                    .help(node.path)
+                HStack(spacing: 6) {
+                    Image(systemName: iconName(for: node))
+                        .foregroundColor(iconColor(for: node))
+                        .imageScale(.small)
+                    Text(node.name)
+                        .font(.system(.caption, design: .default))
+                }
+                .help(node.path)
             })
         } else {
-            return AnyView(Label(node.name, systemImage: "doc.text")
-                .font(.system(.caption, design: .monospaced))
+            return AnyView(
+                HStack(spacing: 6) {
+                    Image(systemName: iconName(for: node))
+                        .foregroundColor(iconColor(for: node))
+                        .imageScale(.small)
+                    Text(node.name)
+                        .font(.system(.caption, design: .monospaced))
+                }
                 .help(node.path)
                 .tag(node.entry.id)
-                .contentShape(Rectangle()))
+                .contentShape(Rectangle())
+            )
         }
     }
 
@@ -153,7 +188,11 @@ struct ContentView: View {
     @ViewBuilder
     private var middleColumn: some View {
         if state.searchResults.isEmpty {
-            fileList
+            if readingStore.preferences.tabLayoutMode == .horizontalTabs {
+                Color.clear.frame(width: 0)
+            } else {
+                fileList
+            }
         } else {
             searchResultsList
         }
@@ -175,20 +214,43 @@ struct ContentView: View {
         )
         return List(selection: manualSelection) {
             ForEach(state.openTabs) { tab in
-                HStack {
-                    Text(tab.path)
-                        .font(.system(.body, design: .monospaced))
-                        .lineLimit(1)
+                let fileName = (tab.path as NSString).lastPathComponent
+                let relativePath = (tab.path as NSString).deletingLastPathComponent
+                
+                HStack(spacing: 10) {
+                    Image(systemName: FileIconMapper.iconName(for: fileName))
+                        .foregroundColor(FileIconMapper.iconColor(for: fileName))
+                        .font(.system(size: 14))
+                        .frame(width: 18)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(fileName)
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .lineLimit(1)
+                        if !relativePath.isEmpty && relativePath != "." {
+                            Text(relativePath)
+                                .font(.system(size: 9))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    
                     Spacer()
+                    
                     Button {
                         state.closeTab(id: tab.id)
                     } label: {
                         Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .bold))
+                            .padding(4)
+                            .background(Color.secondary.opacity(0.1))
+                            .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .help("Close tab")
                 }
+                .padding(.vertical, 4)
                 .tag(tab.id)
             }
         }
@@ -228,14 +290,32 @@ struct ContentView: View {
 
     @ViewBuilder
     private var editorPane: some View {
-        Group {
-            if isSplit {
-                HSplitView {
-                    primaryPane
-                    comparisonPane
+        VStack(spacing: 0) {
+            if readingStore.preferences.tabLayoutMode == .horizontalTabs || readingStore.preferences.tabLayoutMode == .both {
+                if !state.openTabs.isEmpty {
+                    HorizontalTabBar(
+                        openTabs: state.openTabs,
+                        selectedTabID: Binding(
+                            get: { state.selectedTabID },
+                            set: { newValue in
+                                selectAndRecord { state.selectedTabID = newValue }
+                            }
+                        ),
+                        onCloseTab: { id in
+                            state.closeTab(id: id)
+                        }
+                    )
                 }
-            } else {
-                primaryPane
+            }
+            Group {
+                if isSplit {
+                    HSplitView {
+                        primaryPane
+                        comparisonPane
+                    }
+                } else {
+                    primaryPane
+                }
             }
         }
         .safeAreaInset(edge: .bottom) { referencesPanel }
@@ -379,17 +459,15 @@ struct ContentView: View {
         Group {
             switch coreStatus {
             case .disconnected:
-                Label("Core offline", systemImage: "circle")
+                StatusPill(text: "Core offline", color: .gray, pulsing: false)
             case .connecting:
-                Label("Core connecting", systemImage: "circle.dotted")
+                StatusPill(text: "Core connecting", color: .yellow, pulsing: true)
             case .connected(let health):
-                Label("Core \(health.version)", systemImage: "checkmark.circle")
+                StatusPill(text: "Core \(health.version)", color: .green, pulsing: false)
             case .failed:
-                Label("Core unavailable", systemImage: "exclamationmark.circle")
+                StatusPill(text: "Core unavailable", color: .red, pulsing: false)
             }
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
     }
 
     private func statusBanner(_ message: String) -> some View {
@@ -672,9 +750,76 @@ struct ContentView: View {
         }
         return String(describing: error)
     }
+
+    // MARK: - Layout and Visual Helpers
+
+    private func systemImage(for mode: TabLayoutMode) -> String {
+        switch mode {
+        case .verticalList: return "sidebar.left"
+        case .horizontalTabs: return "rectangle.grid.1x2"
+        case .both: return "rectangle.split.3x1"
+        }
+    }
+
+    private func iconName(for node: WorkspaceTreeNode) -> String {
+        if node.isDirectory {
+            return "folder"
+        }
+        return FileIconMapper.iconName(for: node.name)
+    }
+
+    private func iconColor(for node: WorkspaceTreeNode) -> Color {
+        if node.isDirectory {
+            return .accentColor
+        }
+        return FileIconMapper.iconColor(for: node.name)
+    }
 }
 
 private enum MarkdownDisplayMode {
     case preview
     case source
+}
+
+struct StatusPill: View {
+    let text: String
+    let color: Color
+    let pulsing: Bool
+    
+    @State private var isAnimating = false
+    
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+                .opacity(pulsing && isAnimating ? 0.4 : 1.0)
+                .scaleEffect(pulsing && isAnimating ? 1.25 : 1.0)
+                .onAppear {
+                    if pulsing {
+                        withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                            isAnimating = true
+                        }
+                    }
+                }
+                .onChange(of: pulsing) { _, newValue in
+                    if newValue {
+                        withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                            isAnimating = true
+                        }
+                    } else {
+                        withAnimation(.default) {
+                            isAnimating = false
+                        }
+                    }
+                }
+            Text(text)
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(color.opacity(0.12)))
+        .overlay(Capsule().stroke(color.opacity(0.24), lineWidth: 0.5))
+        .foregroundColor(color)
+    }
 }
