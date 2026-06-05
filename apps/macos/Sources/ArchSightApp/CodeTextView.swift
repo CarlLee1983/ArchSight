@@ -17,6 +17,8 @@ struct CodeTextView: NSViewRepresentable {
         Coordinator()
     }
 
+    private static let codeFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+
     /// Maps a canonical token type to a dynamic system color so highlighting
     /// follows light/dark appearance automatically.
     static func color(for type: String) -> NSColor {
@@ -36,14 +38,14 @@ struct CodeTextView: NSViewRepresentable {
         let textView = CodeNSTextView()
         textView.isEditable = false
         textView.isSelectable = true
-        textView.isRichText = false
+        textView.isRichText = false  // disables RTF paste/string= attribute stripping; programmatic textStorage attributes still apply
         textView.drawsBackground = true
         textView.allowsUndo = false
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
-        textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        textView.font = Self.codeFont
         textView.textContainerInset = NSSize(width: 8, height: 8)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = true
@@ -77,7 +79,7 @@ struct CodeTextView: NSViewRepresentable {
             let attributed = NSMutableAttributedString(
                 string: content,
                 attributes: [
-                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+                    .font: Self.codeFont,
                     .foregroundColor: NSColor.labelColor,
                 ]
             )
