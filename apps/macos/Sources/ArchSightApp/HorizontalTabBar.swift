@@ -7,6 +7,8 @@ struct HorizontalTabBar: View {
     @Binding var selectedTabID: FileTab.ID?
     let onCloseTab: (FileTab.ID) -> Void
 
+    @State private var hoveredTabID: FileTab.ID?
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
@@ -26,18 +28,29 @@ struct HorizontalTabBar: View {
                         Button(action: {
                             onCloseTab(tab.id)
                         }) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.secondary)
+                            ArchSightIcon.Close(color: isSelected ? .primary : .secondary)
+                                .padding(4)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .help("Close Tab")
-                        .opacity(isSelected ? 0.8 : 0.4)
+                        .opacity(isSelected ? 0.8 : (hoveredTabID == tab.id ? 0.6 : 0.4))
                     }
                     .padding(.horizontal, 10)
                     .frame(height: 32)
-                    .background(isSelected ? Color(NSColor.textBackgroundColor) : Color.clear)
+                    .background(
+                        isSelected 
+                            ? Color(NSColor.textBackgroundColor) 
+                            : (hoveredTabID == tab.id ? Color(NSColor.quaternaryLabelColor).opacity(0.3) : Color.clear)
+                    )
                     .contentShape(Rectangle())
+                    .onHover { isHovering in
+                        if isHovering {
+                            hoveredTabID = tab.id
+                        } else if hoveredTabID == tab.id {
+                            hoveredTabID = nil
+                        }
+                    }
                     .onTapGesture {
                         selectedTabID = tab.id
                     }
