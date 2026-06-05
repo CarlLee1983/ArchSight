@@ -20,11 +20,23 @@ come from and their licenses.
 
 ## Tree-sitter runtime and grammars
 
-- **Status**: not yet vendored. Phase 4 uses a thin in-memory syntax adapter
-  (`core/internal/syntax`) that keeps the IPC token schema stable.
-- **When bundled**: place grammar binaries here and record the Tree-sitter
-  runtime license (MIT) plus each grammar's license. The adapter boundary stays
-  stable so grammars replace it without changing the macOS client contract.
+- **Used for**: Go syntax highlighting (`core/internal/syntax`).
+- **Binding**: `github.com/malivvan/tree-sitter`, pinned to pseudo-version
+  `v0.0.2-0.20250125152656-46b39a70b658` (commit `46b39a7`). It is cgo-free: it
+  embeds a Wasm build of tree-sitter `v0.24.7` and runs it on `wazero`
+  (`github.com/tetratelabs/wazero`), with `github.com/andybalholm/brotli` for
+  Wasm decompression. The tagged `v0.0.1` release embeds only C/C++; the pinned
+  commit's Wasm includes the `go` grammar (and ~20 others). Swift/TypeScript/
+  Markdown are NOT in the shipped Wasm and need a Wasm rebuild to add later.
+- **Highlight query**: `core/internal/syntax/queries/go/highlights.scm`, vendored
+  from `tree-sitter/tree-sitter-go` commit
+  `7cb21a65af6cc8e5c6742b9dba42881ea1158475` (`queries/highlights.scm`).
+- **Licenses**: tree-sitter runtime — MIT (tree-sitter/tree-sitter). `wazero` —
+  Apache-2.0. `brotli` (andybalholm) — MIT. tree-sitter-go grammar + query — MIT
+  (tree-sitter/tree-sitter-go).
+- **Packaging**: pure Go; the Wasm is embedded inside the binding via `go:embed`,
+  so it ships inside `archsight-core` with no extra files. Highlighting is
+  on-demand and adds no idle memory or child processes.
 
 ## Language servers (optional)
 
