@@ -36,7 +36,7 @@ public struct KeyChord: Equatable, Sendable {
     }
 }
 
-public enum ShortcutCategory: String, CaseIterable, Sendable {
+public enum ShortcutCategory: String, CaseIterable, Hashable, Sendable {
     case navigation
     case view
     case tabs
@@ -66,15 +66,16 @@ public struct ShortcutHint: Equatable, Sendable, Identifiable {
     }
 }
 
-/// Single display source for keyboard hints. Mirrors the bindings declared in
-/// `WorkspaceMenuCommands` / `ContentView`; kept consistent via unit tests.
+/// Single display source for keyboard hints. Mirrors the app's keyboard bindings
+/// (most declared in `WorkspaceMenuCommands` / `ContentView`; a few are AppKit or
+/// system defaults, e.g. Find ⌘F and New Window ⌘N); kept consistent via unit tests.
 public enum ShortcutCatalog {
     public static let all: [ShortcutHint] = [
         // Navigation
         ShortcutHint(id: "newWindow", category: .navigation, label: "New Window", chord: KeyChord(key: "N", command: true)),
         ShortcutHint(id: "openFolder", category: .navigation, label: "Open Folder", chord: KeyChord(key: "O", command: true)),
         ShortcutHint(id: "quickOpen", category: .navigation, label: "Quick Open", chord: KeyChord(key: "P", command: true)),
-        ShortcutHint(id: "findInFile", category: .navigation, label: "Find in File", chord: KeyChord(key: "F", command: true)),
+        ShortcutHint(id: "findInFile", category: .navigation, label: "Find in File", chord: KeyChord(key: "F", command: true)), // AppKit native find bar (usesFindBar), not an explicit app binding
         ShortcutHint(id: "back", category: .navigation, label: "Back", chord: KeyChord(key: "[", command: true)),
         ShortcutHint(id: "forward", category: .navigation, label: "Forward", chord: KeyChord(key: "]", command: true)),
         // View
@@ -85,7 +86,7 @@ public enum ShortcutCatalog {
         ShortcutHint(id: "increaseText", category: .view, label: "Increase Text Size", chord: KeyChord(key: "=", command: true)),
         ShortcutHint(id: "decreaseText", category: .view, label: "Decrease Text Size", chord: KeyChord(key: "-", command: true)),
         // Tabs
-        ShortcutHint(id: "goToTab", category: .tabs, label: "Go to Tab 1–9", chord: KeyChord(key: "1–9", command: true)),
+        ShortcutHint(id: "goToTab", category: .tabs, label: "Go to Tab 1–9", chord: KeyChord(key: "1–9", command: true)), // display range only; real bindings are ⌘1…⌘9
         ShortcutHint(id: "previousTab", category: .tabs, label: "Previous Tab", chord: KeyChord(key: "[", command: true, shift: true)),
         ShortcutHint(id: "nextTab", category: .tabs, label: "Next Tab", chord: KeyChord(key: "]", command: true, shift: true)),
         ShortcutHint(id: "closeTab", category: .tabs, label: "Close Tab / Window", chord: KeyChord(key: "W", command: true)),

@@ -97,12 +97,18 @@ struct ContentView: View {
             },
             toggleSplit: { isSplit.toggle() },
             selectTab: { number in selectTab(at: number) },
-            quickOpen: { isQuickOpenPresented = true },
+            quickOpen: {
+                isShortcutsPresented = false
+                isQuickOpenPresented = true
+            },
             goBack: { goBack() },
             goForward: { goForward() },
             nextTab: { selectAndRecord { state.selectNextTab() } },
             previousTab: { selectAndRecord { state.selectPreviousTab() } },
-            showShortcuts: { isShortcutsPresented = true }
+            showShortcuts: {
+                isQuickOpenPresented = false
+                isShortcutsPresented = true
+            }
         ))
     }
 
