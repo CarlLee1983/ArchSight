@@ -197,10 +197,10 @@ Swift `SyntaxToken`/`OpenFileResult` need no schema change.
   unaffected. Add a post-open measurement as a new evidence point.
 - wazero is in-process — **no new child process**, so the "no child processes at
   idle" and "no orphan after SIGTERM" assertions still hold.
-- Per-file highlight results are cached in memory keyed by (path, content
-  identity) and invalidated on reopen/disk change, matching Phase 4's stated
-  caching behavior. This also reduces instance churn (a cache hit skips
-  `sitter.New` entirely).
+- No highlight cache in this slice. The existing `openFile` handler already
+  re-highlights on every open (the keyword adapter had no cache either), and the
+  measured per-call cost (~6–13 ms) is acceptable for a user-initiated open. A
+  (path, content-identity) cache is a deferred optimization, not a requirement.
 - Files above `maxHighlightBytes` (1 MiB) skip highlighting and render as plain
   text, bounding per-call parse cost and Wasm memory.
 
@@ -273,8 +273,8 @@ Swift `SyntaxToken`/`OpenFileResult` need no schema change.
   regression test that highlights well past that count. Revisit if a future
   binding release adds `Close`/free APIs (would let us reuse one instance for
   ~1 ms/parse).
-- **Large-file highlight cost** — in-memory cache plus the `maxHighlightBytes`
-  cap that degrades to plain text.
+- **Large-file highlight cost** — the `maxHighlightBytes` (1 MiB) cap degrades
+  oversized files to plain text; per-call cost is ~6–13 ms otherwise.
 - **Query/grammar version drift** — vendor a `highlights.scm` matching the
   bundled grammar revision; record both in `third_party/README.md`.
 
@@ -282,5 +282,7 @@ Swift `SyntaxToken`/`OpenFileResult` need no schema change.
 
 - Swift / TypeScript / Markdown Tree-sitter highlighting (needs a Wasm rebuild
   to add those grammars, plus their highlight queries).
+- A per-file highlight cache keyed by (path, content identity) — a perf
+  optimization to skip re-parsing unchanged files on reopen.
 - Wasm slimming to the active language set.
 - User-configurable color themes.
