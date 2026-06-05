@@ -50,6 +50,25 @@ final class CoreSessionTests: XCTestCase {
         XCTAssertTrue(message.contains("boom"))
     }
 
+    func testConnectRetriesTransientHealthFailuresWhileCoreStarts() throws {
+        let supervisor = FakeCoreSupervisor(socketPath: "/tmp/archsight-core.sock")
+        let healthChecker = TransientCoreHealthChecking(failuresBeforeSuccess: 2)
+        let session = CoreSession(
+            supervisor: supervisor,
+            clientFactory: { _ in healthChecker },
+            healthRetryLimit: 5,
+            healthRetryDelay: {}
+        )
+
+        let health = try session.connect()
+
+        XCTAssertEqual(health.version, "0.1.0")
+        XCTAssertEqual(healthChecker.attempts, 3)
+        XCTAssertTrue(supervisor.didStart)
+        XCTAssertFalse(supervisor.didStop)
+        XCTAssertEqual(session.status, .connected(health))
+    }
+
     func testFactoryReturnsNilWithoutCorePath() {
         let session = CoreSessionFactory.fromEnvironment(environment: [:], coreExecutable: nil)
 
@@ -102,5 +121,22 @@ private final class FakeCoreHealthChecking: CoreHealthChecking {
 private final class ThrowingCoreHealthChecking: CoreHealthChecking {
     func health() throws -> HealthResult {
         throw CoreClientError(code: "test", message: "boom")
+    }
+}
+
+private final class TransientCoreHealthChecking: CoreHealthChecking {
+    private let failuresBeforeSuccess: Int
+    private(set) var attempts = 0
+
+    init(failuresBeforeSuccess: Int) {
+        self.failuresBeforeSuccess = failuresBeforeSuccess
+    }
+
+    func health() throws -> HealthResult {
+        attempts += 1
+        if attempts <= failuresBeforeSuccess {
+            throw CoreClientError(code: "connect", message: "socket not ready")
+        }
+        return HealthResult(version: "0.1.0", pid: 42)
     }
 }

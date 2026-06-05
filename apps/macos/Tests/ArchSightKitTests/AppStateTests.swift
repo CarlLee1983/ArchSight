@@ -108,6 +108,16 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(state.openTabs.first?.tokens, [token])
     }
 
+    func testMarkdownPreviewEligibilityUsesCommonMarkdownExtensions() {
+        let readme = FileTab(rootID: "r", path: "README.md", content: "# Title")
+        let note = FileTab(rootID: "r", path: "docs/Decision.MarkDown", content: "# Title")
+        let swift = FileTab(rootID: "r", path: "Sources/App.swift", content: "import SwiftUI")
+
+        XCTAssertTrue(readme.canPreviewMarkdown)
+        XCTAssertTrue(note.canPreviewMarkdown)
+        XCTAssertFalse(swift.canPreviewMarkdown)
+    }
+
     func testBuildsHierarchicalWorkspaceTreeFromFlattenedEntries() {
         let root = WorkspaceRoot(id: "root_1", name: "service", path: "/tmp/service")
         let state = WorkspaceViewState(

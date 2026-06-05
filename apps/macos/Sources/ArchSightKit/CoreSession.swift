@@ -36,6 +36,8 @@ public struct CoreServiceEndpoint: Sendable {
 public final class CoreSession {
     private let supervisor: CoreSupervising
     private let clientFactory: (String) -> CoreHealthChecking
+    private let healthRetryLimit: Int
+    private let healthRetryDelay: () -> Void
 
     public private(set) var status: CoreSessionStatus = .disconnected
 
@@ -47,10 +49,14 @@ public final class CoreSession {
         supervisor: CoreSupervising,
         clientFactory: @escaping (String) -> CoreHealthChecking = { socketPath in
             CoreClient(transport: UnixSocketTransport(socketPath: socketPath))
-        }
+        },
+        healthRetryLimit: Int = 20,
+        healthRetryDelay: @escaping () -> Void = { usleep(50_000) }
     ) {
         self.supervisor = supervisor
         self.clientFactory = clientFactory
+        self.healthRetryLimit = healthRetryLimit
+        self.healthRetryDelay = healthRetryDelay
     }
 
     @discardableResult
@@ -59,7 +65,7 @@ public final class CoreSession {
         do {
             _ = try supervisor.start()
             let client = clientFactory(supervisor.socketPath)
-            let health = try client.health()
+            let health = try waitForHealth(client)
             status = .connected(health)
             return health
         } catch {
@@ -72,6 +78,22 @@ public final class CoreSession {
     public func disconnect() {
         supervisor.stop()
         status = .disconnected
+    }
+
+    private func waitForHealth(_ client: CoreHealthChecking) throws -> HealthResult {
+        let attempts = max(1, healthRetryLimit)
+        var lastError: Error?
+        for attempt in 0..<attempts {
+            do {
+                return try client.health()
+            } catch {
+                lastError = error
+                if attempt < attempts - 1 {
+                    healthRetryDelay()
+                }
+            }
+        }
+        throw lastError ?? CoreClientError(code: "core_unavailable", message: "Core health check failed")
     }
 }
 

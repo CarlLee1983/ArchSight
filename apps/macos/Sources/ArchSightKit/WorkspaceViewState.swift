@@ -223,4 +223,9 @@ public struct FileTab: Equatable, Identifiable, Sendable {
         self.tokens = tokens
         self.isReadOnly = isReadOnly
     }
+
+    public var canPreviewMarkdown: Bool {
+        let lowercasedPath = path.lowercased()
+        return lowercasedPath.hasSuffix(".md") || lowercasedPath.hasSuffix(".markdown")
+    }
 }
