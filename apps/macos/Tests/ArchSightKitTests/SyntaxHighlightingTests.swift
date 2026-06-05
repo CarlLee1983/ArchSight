@@ -43,4 +43,12 @@ final class SyntaxHighlightingTests: XCTestCase {
     func testSpansEmptyForEmptyTokens() {
         XCTAssertTrue(SyntaxHighlighting.spans(for: [], in: "anything").isEmpty)
     }
+
+    func testSpanAtContentEndWithoutTrailingNewline() {
+        let content = "abc" // no trailing newline; 3 UTF-16 units
+        let tokens = [token(1, 1, 1, 4, "keyword")] // columns 1..4 (end exclusive) => whole "abc"
+        let spans = SyntaxHighlighting.spans(for: tokens, in: content)
+        XCTAssertEqual(spans.count, 1)
+        XCTAssertEqual(spans[0].range, NSRange(location: 0, length: 3))
+    }
 }

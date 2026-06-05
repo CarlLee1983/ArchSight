@@ -25,7 +25,8 @@ public enum TextPosition {
 
     /// Inverse of `lineColumn`: converts a 1-based line and 1-based UTF-16 column
     /// into a UTF-16 offset. Lines and columns beyond the text clamp to the
-    /// nearest valid offset (line end for an over-long column).
+    /// nearest valid offset (line end for an over-long column). The result is
+    /// always clamped to `[0, content.utf16.count]`.
     public static func utf16Offset(forLine line: Int, column: Int, in text: String) -> Int {
         let units = Array(text.utf16)
         var currentLine = 1
