@@ -99,6 +99,7 @@ struct ContentView: View {
                 withAnimation(.easeInOut(duration: 0.16)) { isSidebarVisible = true }
             },
             toggleSplit: { isSplit.toggle() },
+            collapseAll: { collapseAll() },
             selectTab: { number in selectTab(at: number) },
             quickOpen: {
                 isShortcutsPresented = false
@@ -231,7 +232,11 @@ struct ContentView: View {
                 if !state.openTabs.isEmpty {
                     openFilesPanel
                 }
-                
+
+                if !state.roots.isEmpty {
+                    foldersHeader
+                }
+
                 List(selection: $sidebarSelection) {
                     ForEach(state.roots) { root in
                         let rootExpanded = Binding<Bool>(
@@ -300,6 +305,25 @@ struct ContentView: View {
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    private var foldersHeader: some View {
+        HStack(spacing: 6) {
+            Text("FOLDERS")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(.secondary)
+            Spacer()
+            Button(action: collapseAll) {
+                Image(systemName: "rectangle.compress.vertical")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Collapse Folders \(ShortcutCatalog.hint("collapseFolders")?.chord.display ?? "")")
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
     }
 
     private var openFilesPanel: some View {
@@ -801,6 +825,13 @@ struct ContentView: View {
         collapsedRoots = []
         state.closeWorkspace()
         refreshSidebarTreeNodes()
+    }
+
+    private func collapseAll() {
+        // Match VSCode "Collapse Folders in Explorer": collapse nested folders
+        // and the root sections together.
+        expandedPaths = []
+        collapsedRoots = Set(state.roots.map(\.id))
     }
 
     private func openEntry(_ entry: WorkspaceEntry) {

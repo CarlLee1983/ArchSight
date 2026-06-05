@@ -9,6 +9,7 @@ struct WorkspaceCommandActions {
     var focusExplorer: () -> Void = {}
     var focusSearch: () -> Void = {}
     var toggleSplit: () -> Void = {}
+    var collapseAll: () -> Void = {}
     var selectTab: (Int) -> Void = { _ in }
     var quickOpen: () -> Void = {}
     var goBack: () -> Void = {}
@@ -51,6 +52,9 @@ struct WorkspaceMenuCommands: Commands {
                 .keyboardShortcut("f", modifiers: [.command, .shift])
             Button("Toggle Split Editor") { actions?.toggleSplit() }
                 .keyboardShortcut("\\", modifiers: .command)
+            Button("Collapse Folders") { actions?.collapseAll() }
+                .keyboardShortcut("0", modifiers: [.command, .option])
+                .disabled(actions == nil)
             Divider()
             Button("Increase Text Size") { readingStore.increaseFont() }
                 .keyboardShortcut("=", modifiers: .command)
