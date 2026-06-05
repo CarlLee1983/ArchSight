@@ -25,3 +25,6 @@ build/
 !.omx/
 !.omx/plans/
 !.omx/plans/*.md
+
+# Superpowers Visual Companion
+.superpowers/
