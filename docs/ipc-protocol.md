@@ -55,6 +55,50 @@ Errors are structured:
 
 No edit, format, code action, completion, or diagnostics methods are part of the protocol.
 
+## Workspace Snapshot Methods
+
+`openWorkspace` starts an in-memory asynchronous scan and returns immediately:
+
+```json
+{
+  "id": "req_open",
+  "method": "openWorkspace",
+  "params": {
+    "roots": ["/Users/alex/Code/service-a", "/Users/alex/Code/service-b"]
+  }
+}
+```
+
+The result includes the snapshot ID and preserved root identities:
+
+```json
+{
+  "id": "req_open",
+  "ok": true,
+  "result": {
+    "workspaceId": "ws_1",
+    "status": "scanning",
+    "roots": [
+      {"id": "root_1", "name": "service-a", "path": "/Users/alex/Code/service-a"}
+    ]
+  }
+}
+```
+
+`listTree` returns the current snapshot state. Entries are flattened but keep `rootId` and `rootPath` so the UI can preserve source-folder identity.
+
+```json
+{
+  "id": "req_tree",
+  "method": "listTree",
+  "params": {
+    "workspaceId": "ws_1"
+  }
+}
+```
+
+During Phase 2, `cancel` accepts a workspace scan ID through `targetId` or `workspaceId`.
+
 ## Streaming
 
 Long-running requests may emit events before a final response:

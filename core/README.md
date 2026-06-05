@@ -15,6 +15,14 @@ It speaks newline-delimited JSON envelopes and currently implements:
 
 Unsupported methods return structured `unsupported_method` errors. Editing, completion, code action, formatting, and diagnostics methods are intentionally absent.
 
+## Phase 2 Workspace Snapshots
+
+The core now maintains asynchronous in-memory workspace snapshots. `openWorkspace` returns immediately with a workspace ID while scanning continues in the core process. `listTree` reads the current snapshot state, and `cancel` can stop an active workspace scan.
+
+Snapshot entries are flattened for UI presentation, but every entry carries `rootId` and `rootPath` so multiple dragged-in folders keep their real filesystem identity. Scanning skips common heavy directories: `.git`, `node_modules`, `build`, `.next`, `DerivedData`, `vendor`, and `.cache`.
+
+Workspace scanning does not write cache files, databases, indexes, or metadata into opened roots.
+
 Run core verification from the repository root:
 
 ```sh

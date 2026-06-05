@@ -123,6 +123,14 @@ Acceptance criteria:
 
 Implement in-memory multi-folder workspace snapshots.
 
+Implementation status:
+
+- Added an asynchronous Go workspace manager under `core/internal/workspace`.
+- Added IPC support for `openWorkspace`, `listTree`, and workspace-scan cancellation.
+- Snapshot entries are flattened while preserving `rootId` and `rootPath`.
+- Scans skip `.git`, `node_modules`, `build`, `.next`, `DerivedData`, `vendor`, and `.cache`.
+- Tests cover multi-root snapshots, ignored directories, no repository metadata writes, cancellation, and IPC open/list behavior.
+
 Tasks:
 
 - Add workspace model preserving source folder identity and real paths.
