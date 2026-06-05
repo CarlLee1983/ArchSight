@@ -47,4 +47,11 @@ final class ShortcutCatalogTests: XCTestCase {
         let flattenedCount = grouped.reduce(0) { $0 + $1.1.count }
         XCTAssertEqual(flattenedCount, ShortcutCatalog.all.count)
     }
+
+    func testCollapseFoldersHintIsRegistered() {
+        let hint = ShortcutCatalog.hint("collapseFolders")
+        XCTAssertEqual(hint?.category, .view)
+        XCTAssertEqual(hint?.label, "Collapse Folders")
+        XCTAssertEqual(hint?.chord.display, "⌥⌘0")
+    }
 }

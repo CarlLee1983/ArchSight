@@ -83,6 +83,7 @@ public enum ShortcutCatalog {
         ShortcutHint(id: "showExplorer", category: .view, label: "Show Explorer", chord: KeyChord(key: "E", command: true, shift: true)),
         ShortcutHint(id: "showSearch", category: .view, label: "Show Search", chord: KeyChord(key: "F", command: true, shift: true)),
         ShortcutHint(id: "splitEditor", category: .view, label: "Split Editor", chord: KeyChord(key: "\\", command: true)),
+        ShortcutHint(id: "collapseFolders", category: .view, label: "Collapse Folders", chord: KeyChord(key: "0", command: true, option: true)),
         ShortcutHint(id: "increaseText", category: .view, label: "Increase Text Size", chord: KeyChord(key: "=", command: true)),
         ShortcutHint(id: "decreaseText", category: .view, label: "Decrease Text Size", chord: KeyChord(key: "-", command: true)),
         // Tabs
