@@ -250,11 +250,19 @@ func (s *Server) listTree(req Request) Response {
 	if !ok {
 		return ErrorResponse(req.ID, NewError("not_found", "Workspace not found: "+params.WorkspaceID))
 	}
+	roots := snapshot.Roots
+	if roots == nil {
+		roots = []workspace.Root{}
+	}
+	entries := snapshot.Entries
+	if entries == nil {
+		entries = []workspace.Entry{}
+	}
 	return SuccessResponse(req.ID, listTreeResult{
 		WorkspaceID: snapshot.ID,
 		Status:      snapshot.Status,
-		Roots:       snapshot.Roots,
-		Entries:     snapshot.Entries,
+		Roots:       roots,
+		Entries:     entries,
 		Error:       snapshot.Error,
 	})
 }

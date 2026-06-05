@@ -85,6 +85,63 @@ func TestServerOpensWorkspaceAndListsTree(t *testing.T) {
 	}
 }
 
+func TestListTreeReturnsEmptyArraysWhileScanning(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "service")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+
+	conn, cleanup := startTestServer(t)
+	defer cleanup()
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+
+	writeJSON(t, conn, map[string]any{
+		"id":     "req_open",
+		"method": "openWorkspace",
+		"params": map[string]any{"roots": []string{root}},
+	})
+	openResp := readResponse[struct {
+		WorkspaceID string `json:"workspaceId"`
+	}](t, reader)
+	if !openResp.OK {
+		t.Fatalf("openWorkspace failed: %+v", openResp.Error)
+	}
+
+	writeJSON(t, conn, map[string]any{
+		"id":     "req_list",
+		"method": "listTree",
+		"params": map[string]any{"workspaceId": openResp.Result.WorkspaceID},
+	})
+	line, err := reader.ReadBytes('\n')
+	if err != nil {
+		t.Fatalf("ReadBytes returned error: %v", err)
+	}
+	if string(line) == "" {
+		t.Fatal("expected listTree response")
+	}
+
+	var decoded struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			Roots   []workspace.Root  `json:"roots"`
+			Entries []workspace.Entry `json:"entries"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(line, &decoded); err != nil {
+		t.Fatalf("Unmarshal returned error: %v; line=%s", err, line)
+	}
+	if !decoded.OK {
+		t.Fatalf("listTree failed: %s", line)
+	}
+	if decoded.Result.Roots == nil {
+		t.Fatalf("expected roots to decode as an empty or populated array, got nil; line=%s", line)
+	}
+	if decoded.Result.Entries == nil {
+		t.Fatalf("expected entries to decode as an empty array, got nil; line=%s", line)
+	}
+}
+
 type ResponseEnvelope[T any] struct {
 	ID     string      `json:"id"`
 	OK     bool        `json:"ok"`
