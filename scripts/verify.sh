@@ -62,6 +62,11 @@ check_file "docs/packaging.md"
 check_file "scripts/setup.sh"
 check_file "scripts/build-app.sh"
 
+section "Phase 9 performance gate"
+check_file "scripts/perf-gate.sh"
+check_file "docs/performance.md"
+check_file "core/cmd/archsight-perfgate/main.go"
+
 section "Toolchain"
 check_tool "go" "Install Go before Phase 1 core work."
 check_tool "swift" "Install Xcode or Swift toolchain before macOS app work."

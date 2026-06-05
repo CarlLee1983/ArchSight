@@ -119,6 +119,10 @@ func (s *Server) handleConn(conn net.Conn) {
 	defer conn.Close()
 
 	scanner := bufio.NewScanner(conn)
+	// Allow large request lines (e.g. many workspace roots) past the default 64KB
+	// token cap so a big request is parsed rather than silently truncating the
+	// connection.
+	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	for scanner.Scan() {
 		req, err := DecodeRequest(scanner.Bytes())
 		if err != nil {

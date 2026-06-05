@@ -50,9 +50,25 @@ The core resolves its `ripgrep` binary at startup through
 `rg` bundled next to the core executable (the shipped app bundle), then the bare
 `rg` name resolved from `PATH` for development. See `docs/packaging.md`.
 
+## Phase 9 Performance and Reliability Gate
+
+`core/internal/fixtures` generates a deterministic large synthetic workspace plus
+a content manifest used to prove that opening, scanning, searching, and
+navigating never write into source roots. `core/internal/perf` measures process
+resident memory and child processes. `core/internal/e2e` runs the full read-only
+flow over a real Unix Domain Socket with a fake language server, asserting no LSP
+starts on load and that the workspace is unchanged.
+
+`core/cmd/archsight-perfgate` launches the real core against the synthetic
+workspace and reports startup latency, scan time, idle memory against the
+`M <= 50MB` target, child-process count, search match count and cancellation,
+socket cleanup, orphan processes, and read-only proof. Run it via
+`scripts/perf-gate.sh`; see `docs/performance.md`.
+
 Run core verification from the repository root:
 
 ```sh
 go test ./core/...
 go build ./core/cmd/archsight-core
+scripts/perf-gate.sh          # Phase 9 performance and reliability gate
 ```

@@ -323,6 +323,16 @@ Acceptance criteria:
 
 Validate the product thesis.
 
+Implementation status:
+
+- Added `core/internal/fixtures` to generate a deterministic large synthetic workspace (parametrized `Dirs`/`FilesPerDir`, anchor `main.go`/`target.go`, one search needle per leaf file) plus a content `Manifest`/`DiffManifests` used to prove workspace operations never write into source roots. Unit tested.
+- Added `core/internal/perf` with process-measurement helpers (`ProcessRSSKilobytes`, `DescendantPIDs`, `IsAlive`) and tested pure parsers for `ps`/`pgrep` output.
+- Added `core/internal/e2e`, a deterministic end-to-end smoke test that drives a real IPC server over a Unix Domain Socket: `health → openWorkspace → listTree (until ready) → search → openFile → definition (via fake LSP) → idle-out`. It asserts no language server starts during workspace load, that the definition lazily starts exactly one server, that the server idles out after the timeout, and that the workspace manifest is unchanged.
+- Added `core/cmd/archsight-perfgate`, a harness that launches the real `archsight-core` binary against a large synthetic workspace and measures startup latency, scan time, idle RSS against the `M <= 50MB` target, child-process count (no LSP on load), search match count, best-effort search cancellation, socket cleanup, orphan processes after `SIGTERM`, and read-only proof. It emits a human report and optional JSON, and exits non-zero on correctness failures (`--strict` also fails on memory over budget).
+- Added `scripts/perf-gate.sh` to build the core and run the gate, and documented the gate, sample evidence, and the cancellation caveat in `docs/performance.md`.
+- Extended `scripts/verify.sh` with Phase 9 artifact checks; the new packages run under `go test ./core/...`.
+- Verified evidence on Apple M4 (5,002 files): startup 421 ms, scan 28 ms, idle memory 12.1 MB (under the 50 MB target), 0 child processes at idle, 5000/5000 search matches, socket removed, no orphan processes, workspace unchanged.
+
 Tasks:
 
 - Add a fixture or script to open a large synthetic workspace.
