@@ -24,6 +24,10 @@ public final class ReadingPreferencesStore {
         update { $0.lineSpacing = spacing }
     }
 
+    public func setTabLayoutMode(_ mode: TabLayoutMode) {
+        update { $0.tabLayoutMode = mode }
+    }
+
     public func increaseFont() {
         preferences = preferences.increasedFont()
         persist()

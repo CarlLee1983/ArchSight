@@ -58,4 +58,26 @@ final class ReadingPreferencesTests: XCTestCase {
         XCTAssertEqual(ReadingThemeID.solarized.displayName, "Solarized")
         XCTAssertEqual(ReadingThemeID.highContrast.displayName, "High Contrast")
     }
+
+    func testTabLayoutModeDisplayName() {
+        XCTAssertEqual(TabLayoutMode.verticalList.displayName, "Vertical Cards")
+        XCTAssertEqual(TabLayoutMode.horizontalTabs.displayName, "Horizontal Tabs")
+        XCTAssertEqual(TabLayoutMode.both.displayName, "Both Layouts")
+    }
+
+    func testDecodingBackwardCompatibility() throws {
+        let oldJSON = """
+        {
+            "theme": "github",
+            "fontScale": 1.15,
+            "lineSpacing": "relaxed"
+        }
+        """
+        let data = Data(oldJSON.utf8)
+        let decoded = try JSONDecoder().decode(ReadingPreferences.self, from: data)
+        XCTAssertEqual(decoded.theme, .github)
+        XCTAssertEqual(decoded.fontScale, 1.15, accuracy: 0.001)
+        XCTAssertEqual(decoded.lineSpacing, .relaxed)
+        XCTAssertEqual(decoded.tabLayoutMode, .verticalList)
+    }
 }

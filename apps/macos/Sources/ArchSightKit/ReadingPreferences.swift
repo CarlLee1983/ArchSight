@@ -49,19 +49,57 @@ public enum LineSpacing: String, CaseIterable, Codable, Sendable {
         }
     }
 }
+public enum TabLayoutMode: String, CaseIterable, Codable, Sendable {
+    case verticalList
+    case horizontalTabs
+    case both
+
+    public var displayName: String {
+        switch self {
+        case .verticalList: return "Vertical Cards"
+        case .horizontalTabs: return "Horizontal Tabs"
+        case .both: return "Both Layouts"
+        }
+    }
+}
 
 public struct ReadingPreferences: Equatable, Sendable, Codable {
     public var theme: ReadingThemeID
     public var fontScale: Double
     public var lineSpacing: LineSpacing
+    public var tabLayoutMode: TabLayoutMode
 
-    public init(theme: ReadingThemeID, fontScale: Double, lineSpacing: LineSpacing) {
+    public init(theme: ReadingThemeID, fontScale: Double, lineSpacing: LineSpacing, tabLayoutMode: TabLayoutMode = .verticalList) {
         self.theme = theme
         self.fontScale = fontScale
         self.lineSpacing = lineSpacing
+        self.tabLayoutMode = tabLayoutMode
     }
 
-    public static let `default` = ReadingPreferences(theme: .system, fontScale: 1.0, lineSpacing: .normal)
+    public static let `default` = ReadingPreferences(theme: .system, fontScale: 1.0, lineSpacing: .normal, tabLayoutMode: .verticalList)
+
+    private enum CodingKeys: String, CodingKey {
+        case theme
+        case fontScale
+        case lineSpacing
+        case tabLayoutMode
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.theme = try container.decode(ReadingThemeID.self, forKey: .theme)
+        self.fontScale = try container.decode(Double.self, forKey: .fontScale)
+        self.lineSpacing = try container.decode(LineSpacing.self, forKey: .lineSpacing)
+        self.tabLayoutMode = try container.decodeIfPresent(TabLayoutMode.self, forKey: .tabLayoutMode) ?? .verticalList
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(theme, forKey: .theme)
+        try container.encode(fontScale, forKey: .fontScale)
+        try container.encode(lineSpacing, forKey: .lineSpacing)
+        try container.encode(tabLayoutMode, forKey: .tabLayoutMode)
+    }
 
     /// Discrete font scale steps used by the A- / A+ controls.
     public static let fontScaleSteps: [Double] = [0.85, 1.0, 1.15, 1.3, 1.5]
