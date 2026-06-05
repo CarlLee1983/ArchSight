@@ -154,9 +154,11 @@ public struct WorkspaceViewState: Equatable, Sendable {
         }
     }
 
-    /// Empties the workspace back to a blank state while keeping the same
-    /// workspaceId so new roots can still be added to it.
+    /// Empties the workspace back to a completely blank state, including clearing
+    /// workspaceId so the next folder-open starts a fresh workspace in the core
+    /// rather than appending to the now-closed one (which would cause phantom roots).
     public mutating func closeWorkspace() {
+        workspaceId = nil
         roots = []
         entries = []
         openTabs = []

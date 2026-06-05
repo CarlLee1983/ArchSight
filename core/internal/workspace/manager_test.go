@@ -289,6 +289,77 @@ func TestRemoveRootUnknownErrors(t *testing.T) {
 	}
 }
 
+// TestFinishAppendDropsEntriesForRemovedRoot verifies the invariant that every
+// entry's RootID is a current root even when RemoveRoot races with a concurrent
+// scanAppend. We pause the scan inside beforeEntry, remove the root under the
+// lock, then release the scan — finishAppend must filter out the stale entries.
+func TestFinishAppendDropsEntriesForRemovedRoot(t *testing.T) {
+	dirA := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dirA, "a.txt"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dirB := t.TempDir()
+	// Give dirB several files so the scanner has at least one entry to process
+	// before we unblock it.
+	for _, name := range []string{"b1.txt", "b2.txt", "b3.txt"} {
+		if err := os.WriteFile(filepath.Join(dirB, name), []byte(name), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	manager := NewManager()
+
+	opened, err := manager.Open(context.Background(), []string{dirA})
+	if err != nil {
+		t.Fatalf("Open error: %v", err)
+	}
+	waitForSnapshot(t, manager, opened.ID)
+
+	// Block at the very first entry of the dirB scan so we can call RemoveRoot
+	// while the append scan is still in flight.
+	blocked := make(chan struct{})
+	unblock := make(chan struct{})
+	once := false
+	manager.beforeEntry = func() {
+		if !once {
+			once = true
+			close(blocked)
+			<-unblock
+		}
+	}
+
+	added, err := manager.AddRoots(context.Background(), opened.ID, []string{dirB})
+	if err != nil {
+		t.Fatalf("AddRoots error: %v", err)
+	}
+	root2ID := added.Roots[len(added.Roots)-1].ID
+
+	// Wait until the scan goroutine is blocked on the first entry, then remove
+	// the root it is scanning. This simulates a concurrent RemoveRoot call
+	// arriving before finishAppend commits its entries.
+	select {
+	case <-blocked:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for scan to block")
+	}
+	if _, err := manager.RemoveRoot(opened.ID, root2ID); err != nil {
+		t.Fatalf("RemoveRoot error: %v", err)
+	}
+	// Release the blocked scan so finishAppend runs.
+	close(unblock)
+
+	waitForSnapshot(t, manager, opened.ID)
+	got, ok := manager.Get(opened.ID)
+	if !ok {
+		t.Fatal("snapshot not found after append+remove race")
+	}
+	for _, e := range got.Entries {
+		if e.RootID == root2ID {
+			t.Errorf("found orphaned entry %q with removed root %s", e.Path, root2ID)
+		}
+	}
+}
+
 func TestOpenAssignsSequentialRootIDsFromOne(t *testing.T) {
 	dirA := t.TempDir()
 	dirB := t.TempDir()

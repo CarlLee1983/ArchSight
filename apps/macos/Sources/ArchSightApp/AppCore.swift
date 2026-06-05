@@ -3,6 +3,9 @@ import Observation
 
 /// App-level owner of the single shared core session. Every window reads the
 /// same endpoint so only one core process runs regardless of window count.
+/// @MainActor is declared because AppCore is only ever accessed from SwiftUI
+/// views and `.task` closures, which all run on the main actor.
+@MainActor
 @Observable
 final class AppCore {
     private(set) var status: CoreSessionStatus = .disconnected

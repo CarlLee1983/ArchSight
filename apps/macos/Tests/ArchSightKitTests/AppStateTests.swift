@@ -213,7 +213,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(state.selectedTabID, "root_2:g.txt")
     }
 
-    func testCloseWorkspaceClearsEverythingButKeepsWorkspaceId() {
+    func testCloseWorkspaceClearsEverythingIncludingWorkspaceId() {
         let searchMatch = try! JSONDecoder().decode(SearchMatch.self, from: """
         {"rootId":"root_1","rootPath":"/tmp/a","path":"a.txt","line":1,"column":1,"preview":"hit","ranges":[]}
         """.data(using: .utf8)!)
@@ -235,7 +235,7 @@ final class AppStateTests: XCTestCase {
 
         state.closeWorkspace()
 
-        XCTAssertEqual(state.workspaceId, "ws_1")
+        XCTAssertNil(state.workspaceId)
         XCTAssertTrue(state.roots.isEmpty)
         XCTAssertTrue(state.entries.isEmpty)
         XCTAssertTrue(state.openTabs.isEmpty)

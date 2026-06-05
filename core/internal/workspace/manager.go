@@ -158,7 +158,19 @@ func (m *Manager) finishAppend(id string, err error, newEntries []Entry) {
 		snapshot.Status = StatusFailed
 		snapshot.Error = err.Error()
 	default:
-		snapshot.Entries = append(snapshot.Entries, newEntries...)
+		// Build a set of current root ids so we can drop any entry whose root
+		// was removed while the scan was in flight (e.g. RemoveRoot called
+		// concurrently), preserving the invariant that every entry's RootID
+		// is a current root.
+		currentRoots := make(map[string]struct{}, len(snapshot.Roots))
+		for _, r := range snapshot.Roots {
+			currentRoots[r.ID] = struct{}{}
+		}
+		for _, e := range newEntries {
+			if _, ok := currentRoots[e.RootID]; ok {
+				snapshot.Entries = append(snapshot.Entries, e)
+			}
+		}
 		slices.SortFunc(snapshot.Entries, func(a, b Entry) int {
 			if a.RootID != b.RootID {
 				return strings.Compare(a.RootID, b.RootID)

@@ -190,7 +190,7 @@ struct ContentView: View {
                         .contextMenu {
                             Button("Remove Folder from Workspace") { removeRoot(root) }
                             Divider()
-                            Button("Close Folder") { closeWorkspace() }
+                            Button("Close All Folders") { closeWorkspace() }
                         }
                     }
                 }
