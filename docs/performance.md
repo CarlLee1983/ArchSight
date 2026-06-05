@@ -65,7 +65,8 @@ Syntax highlighting parses on demand with a fresh Tree-sitter (wazero) instance
 per opened file: the first Go file in a session pays a one-time Wasm compile
 (~90 ms), subsequent files ~6–13 ms. Highlighting runs in-process (no child
 process) and does not affect idle memory, which is measured before any file is
-opened.
+opened. (These figures are from manual benchmarks on Apple M4; the perf gate
+does not open files, so it does not exercise highlighting.)
 
 ## A note on search cancellation
 

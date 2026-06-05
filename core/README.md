@@ -39,9 +39,10 @@ Syntax metadata is produced by `core/internal/syntax`:
 
 - **Go** uses real Tree-sitter via the cgo-free wazero binding
   (`github.com/malivvan/tree-sitter`, pinned pseudo-version) with a vendored
-  `tree-sitter-go` `highlights.scm`. A fresh parser instance is built per
-  highlight call; the pinned binding has no tree/cursor free APIs and a reused
-  instance traps after ~270 parses.
+  `tree-sitter-go` `highlights.scm`. A fresh Tree-sitter instance (the whole
+  wazero module, not just the parser) is built per highlight call; the pinned
+  binding has no tree/cursor/module free APIs, so reusing one instance leaks
+  Wasm memory and traps after ~270 parses.
 - **Swift, TypeScript, and Markdown** keep the keyword token adapter.
 - **Unknown extensions** degrade to plain text with an empty token list.
 

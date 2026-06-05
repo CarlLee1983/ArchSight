@@ -186,10 +186,11 @@ Implementation status:
 - Tests cover supported file content/tokens, unsupported plain-text fallback, path traversal rejection, and ignored files outside the snapshot.
 - Go highlighting now uses real Tree-sitter via the cgo-free wazero binding
   (`github.com/malivvan/tree-sitter`, pinned) with a vendored `tree-sitter-go`
-  `highlights.scm`; a fresh parser instance is built per highlight (the pinned
-  binding has no tree/cursor free APIs and a reused instance traps after ~270
-  parses). Swift/TypeScript/Markdown keep the keyword adapter; unknown
-  extensions stay plain text.
+  `highlights.scm`; a fresh Tree-sitter instance (the whole wazero module, not
+  just the parser) is built per highlight call (the pinned binding has no
+  tree/cursor/module free APIs, so reusing one instance leaks Wasm memory and
+  traps after ~270 parses). Swift/TypeScript/Markdown keep the keyword adapter;
+  unknown extensions stay plain text.
 
 Tasks:
 
