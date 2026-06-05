@@ -34,8 +34,10 @@ and its low-memory / simple-packaging premise.
 
 ## Non-Goals
 
-- Tree-sitter highlighting for Swift / TypeScript / Markdown (next slice; their
-  grammars are already bundled, only highlight queries are missing).
+- Tree-sitter highlighting for Swift / TypeScript / Markdown (next slice). Their
+  grammars are NOT in the shipped Wasm, so that slice must first rebuild the Wasm
+  via the binding's `_gen` toolchain (needs a C/Wasm toolchain), then add each
+  language's highlight query.
 - Semantic highlighting beyond what `highlights.scm` queries provide (no LSP
   semantic tokens, no type inference).
 - Slimming the bundled Wasm to only the Go grammar (tracked tradeoff; deferred).
@@ -56,20 +58,34 @@ and its low-memory / simple-packaging premise.
 
 ## Dependency: `github.com/malivvan/tree-sitter`
 
-Verified facts (clone of `main`, commit `46b39a7`, tagged 2025-01-25):
+Verified facts (commit `46b39a7`, 2025-01-25), confirmed by a working PoC that
+parses Go and runs a highlight query end-to-end:
 
 - cgo-free; wraps tree-sitter Wasm (`Version = v0.24.7`) on `wazero`.
-- Single embedded `lib/ts.wasm.br` (brotli, **1.5 MB**) carries the tree-sitter
-  runtime **and ~30 grammars**, including `golang`, `swift`, `typescript`,
-  `markdown`. Languages are retrieved by name: `ts.Language("golang")`.
+- **Version pinning is non-obvious.** The only tagged release, **`v0.0.1`,
+  embeds a Wasm with ONLY C and C++** (`LanguageC`/`LanguageCpp`; no Go). Go
+  support and the by-name `ts.Language("go")` API live on an **untagged `main`
+  commit**. We therefore pin the pseudo-version
+  **`v0.0.2-0.20250125152656-46b39a70b658`** (commit `46b39a7`) in `go.mod`.
+- The pinned commit's `lib/ts.wasm.br` (brotli, **1.5 MB**, `go:embed`-ed)
+  carries the tree-sitter runtime and ~22 grammars **including `go`** — the
+  language name is `"go"` (`ts.Language("go")`), not `"golang"`.
+  **`swift`, `typescript`, and `markdown` are NOT in this shipped Wasm** — their
+  grammar *sources* exist in the repo but were not compiled into `ts.wasm.br`.
 - Full query engine present (`NewQuery`, `QueryCursor`, `QueryCapture`,
   `CaptureNameForID`) — this is what drives `.scm`-based highlighting.
+- API at this commit takes **no `context.Context`** (e.g. `sitter.New(nil, nil)`,
+  `ts.Language("go")`, `parser.ParseString(content)`, `qc.NextMatch()`). (The
+  released v0.0.1 API differs — it threads `context.Context`. We code against the
+  pinned commit's API.)
 - Direct deps only: `github.com/andybalholm/brotli`, `github.com/tetratelabs/wazero`
-  (both pure Go). Requires Go 1.23.4+.
+  (both pure Go). Requires Go 1.23.4+ (ArchSight is on Go 1.25).
 - **No `.scm` highlight queries are bundled** (`find . -name '*.scm'` → 0). We
-  must vendor `highlights.scm` ourselves.
-- **Pre-release**: README warns of bugs and breaking changes; releases are
-  tagged. We pin an exact version in `go.mod`.
+  vendor `tree-sitter-go`'s `queries/highlights.scm` (grammar commit
+  `7cb21a65af6cc8e5c6742b9dba42881ea1158475`) ourselves.
+- **Pre-release, untagged commit**: elevated churn risk. Mitigation: the exact
+  pseudo-version is pinned, and the binding is isolated behind the `syntax`
+  package so it can be swapped without touching callers.
 
 ### Decisions (approved)
 
@@ -92,7 +108,7 @@ clarity and testability:
   else to the existing keyword/plain-text behavior.
 - `treesitter.go` — Tree-sitter engine wrapper:
   - Lazy shared init via `sync.Once`: build the `TreeSitter` Wasm instance and
-    load the `golang` language **on first highlight request only** (never at
+    load the `go` language **on first highlight request only** (never at
     process start), so startup latency and idle RSS are unchanged.
   - A `sync.Mutex` serializes parse+query calls (wazero modules are not
     goroutine-safe; the read-only, on-demand workload makes serialization
@@ -243,6 +259,7 @@ Swift `SyntaxToken`/`OpenFileResult` need no schema change.
 
 ## Out-of-scope follow-ups (noted, not built here)
 
-- Swift / TypeScript / Markdown Tree-sitter highlighting (queries only).
+- Swift / TypeScript / Markdown Tree-sitter highlighting (needs a Wasm rebuild
+  to add those grammars, plus their highlight queries).
 - Wasm slimming to the active language set.
 - User-configurable color themes.
