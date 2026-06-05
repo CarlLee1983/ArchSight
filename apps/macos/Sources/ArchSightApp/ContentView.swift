@@ -12,6 +12,8 @@ struct ContentView: View {
     @State private var isSplit = false
     @State private var comparisonTabID: FileTab.ID?
     @State private var sidebarSelection: WorkspaceEntry.ID?
+    @State private var sidebarTreeNodes: [WorkspaceRoot.ID: [WorkspaceTreeNode]] = [:]
+    @State private var sidebarFileEntriesByID: [WorkspaceEntry.ID: WorkspaceEntry] = [:]
     @State private var searchSelection: SearchMatch.ID?
     @State private var pendingScrollLine: Int?
 
@@ -91,24 +93,28 @@ struct ContentView: View {
         List(selection: $sidebarSelection) {
             ForEach(state.roots) { root in
                 Section(root.name) {
-                    let files = state.fileEntries.filter { $0.rootId == root.id }
-                    if files.isEmpty {
+                    let nodes = sidebarTreeNodes[root.id, default: []]
+                    if nodes.isEmpty {
                         Text("No files")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(files) { entry in
-                            Text(entry.path)
-                                .font(.system(.caption, design: .monospaced))
-                                .help(entry.path)
-                                .tag(entry.id)
-                                .onTapGesture(count: 2) { openEntry(entry) }
+                        ForEach(nodes) { node in
+                            sidebarNode(node)
                         }
                     }
                 }
             }
         }
         .navigationTitle("Workspace")
+        .onChange(of: sidebarSelection) { _, newSelection in
+            guard let id = newSelection,
+                  let entry = sidebarFileEntriesByID[id]
+            else {
+                return
+            }
+            openEntry(entry)
+        }
         .onKeyPress(.return) {
             openSelectedSidebarEntry()
             return .handled
@@ -117,6 +123,26 @@ struct ContentView: View {
             if state.roots.isEmpty {
                 ContentUnavailableView("No Workspace", systemImage: "folder")
             }
+        }
+    }
+
+    private func sidebarNode(_ node: WorkspaceTreeNode) -> AnyView {
+        if node.isDirectory {
+            return AnyView(DisclosureGroup {
+                ForEach(node.children) { child in
+                    sidebarNode(child)
+                }
+            } label: {
+                Label(node.name, systemImage: "folder")
+                    .font(.system(.caption, design: .default))
+                    .help(node.path)
+            })
+        } else {
+            return AnyView(Label(node.name, systemImage: "doc.text")
+                .font(.system(.caption, design: .monospaced))
+                .help(node.path)
+                .tag(node.entry.id)
+                .contentShape(Rectangle()))
         }
     }
 
@@ -400,6 +426,7 @@ struct ContentView: View {
             )
         }
         state.roots.append(contentsOf: nextRoots)
+        refreshSidebarTreeNodes()
         state.errorMessage = "Core service is not connected; tree, file, and search are unavailable."
     }
 
@@ -419,6 +446,7 @@ struct ContentView: View {
                 state.workspaceId = result.workspaceId
                 state.roots = result.roots
                 state.entries = result.entries
+                refreshSidebarTreeNodes()
                 state.isLoading = false
             } catch {
                 state.isLoading = false
@@ -428,7 +456,21 @@ struct ContentView: View {
     }
 
     private func openEntry(_ entry: WorkspaceEntry) {
+        sidebarSelection = entry.id
         loadFile(rootId: entry.rootId, path: entry.path, scrollLine: nil)
+    }
+
+    private func refreshSidebarTreeNodes() {
+        sidebarTreeNodes = Dictionary(
+            uniqueKeysWithValues: state.roots.map { root in
+                (root.id, state.treeEntries(for: root))
+            }
+        )
+        sidebarFileEntriesByID = Dictionary(
+            uniqueKeysWithValues: state.fileEntries.map { entry in
+                (entry.id, entry)
+            }
+        )
     }
 
     private func openMatch(_ match: SearchMatch) {
@@ -529,7 +571,7 @@ struct ContentView: View {
 
     private func openSelectedSidebarEntry() {
         guard let id = sidebarSelection,
-              let entry = state.fileEntries.first(where: { $0.id == id })
+              let entry = sidebarFileEntriesByID[id]
         else {
             return
         }

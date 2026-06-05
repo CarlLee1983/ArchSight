@@ -107,4 +107,45 @@ final class AppStateTests: XCTestCase {
         state.openFile(rootID: "r", path: "main.go", content: "func x() {}", tokens: [token])
         XCTAssertEqual(state.openTabs.first?.tokens, [token])
     }
+
+    func testBuildsHierarchicalWorkspaceTreeFromFlattenedEntries() {
+        let root = WorkspaceRoot(id: "root_1", name: "service", path: "/tmp/service")
+        let state = WorkspaceViewState(
+            roots: [root],
+            entries: [
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/service", path: "README.md", name: "README.md", kind: "file"),
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/service", path: "Sources", name: "Sources", kind: "directory"),
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/service", path: "Sources/App.swift", name: "App.swift", kind: "file"),
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/service", path: "Sources/Views", name: "Views", kind: "directory"),
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/service", path: "Sources/Views/MainView.swift", name: "MainView.swift", kind: "file")
+            ]
+        )
+
+        let tree = state.treeEntries(for: root)
+
+        XCTAssertEqual(tree.map(\.name), ["Sources", "README.md"])
+        XCTAssertTrue(tree[0].isDirectory)
+        XCTAssertEqual(tree[0].children.map(\.name), ["Views", "App.swift"])
+        XCTAssertEqual(tree[0].children[0].children.map(\.name), ["MainView.swift"])
+    }
+
+    func testWorkspaceTreeSortsRootFoldersBeforeFilesLikeVSCode() {
+        let root = WorkspaceRoot(id: "root_1", name: "ArchSight", path: "/tmp/ArchSight")
+        let state = WorkspaceViewState(
+            roots: [root],
+            entries: [
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/ArchSight", path: ".gitignore", name: ".gitignore", kind: "file"),
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/ArchSight", path: "AGENTS.md", name: "AGENTS.md", kind: "file"),
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/ArchSight", path: "apps", name: "apps", kind: "directory"),
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/ArchSight", path: ".omx", name: ".omx", kind: "directory"),
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/ArchSight", path: "core", name: "core", kind: "directory"),
+                WorkspaceEntry(rootId: "root_1", rootPath: "/tmp/ArchSight", path: "README.md", name: "README.md", kind: "file")
+            ]
+        )
+
+        let tree = state.treeEntries(for: root)
+
+        XCTAssertEqual(tree.map(\.name), [".omx", "apps", "core", ".gitignore", "AGENTS.md", "README.md"])
+        XCTAssertEqual(tree.map(\.isDirectory), [true, true, true, false, false, false])
+    }
 }

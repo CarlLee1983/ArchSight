@@ -51,6 +51,65 @@ public struct WorkspaceViewState: Equatable, Sendable {
         entries.filter { !$0.isDirectory }
     }
 
+    public func treeEntries(for root: WorkspaceRoot) -> [WorkspaceTreeNode] {
+        let rootEntries = entries.filter { $0.rootId == root.id }
+        var directories: [String: WorkspaceTreeNode] = [:]
+        var files: [WorkspaceTreeNode] = []
+
+        for entry in rootEntries {
+            if entry.isDirectory {
+                directories[entry.path] = WorkspaceTreeNode(entry: entry, children: [])
+            } else {
+                files.append(WorkspaceTreeNode(entry: entry, children: []))
+            }
+        }
+
+        for file in files {
+            let parentPath = Self.parentPath(for: file.path)
+            if parentPath != nil, directories[parentPath!] == nil {
+                directories[parentPath!] = WorkspaceTreeNode(
+                    rootId: root.id,
+                    rootPath: root.path,
+                    path: parentPath!,
+                    name: Self.name(for: parentPath!),
+                    kind: "directory",
+                    children: []
+                )
+            }
+        }
+
+        for path in directories.keys {
+            var parent = Self.parentPath(for: path)
+            while let parentPath = parent, directories[parentPath] == nil {
+                directories[parentPath] = WorkspaceTreeNode(
+                    rootId: root.id,
+                    rootPath: root.path,
+                    path: parentPath,
+                    name: Self.name(for: parentPath),
+                    kind: "directory",
+                    children: []
+                )
+                parent = Self.parentPath(for: parentPath)
+            }
+        }
+
+        var childrenByParent: [String?: [WorkspaceTreeNode]] = [:]
+        for directory in directories.values {
+            childrenByParent[Self.parentPath(for: directory.path), default: []].append(directory)
+        }
+        for file in files {
+            childrenByParent[Self.parentPath(for: file.path), default: []].append(file)
+        }
+
+        func build(_ node: WorkspaceTreeNode) -> WorkspaceTreeNode {
+            var next = node
+            next.children = sorted(childrenByParent[node.path, default: []]).map(build)
+            return next
+        }
+
+        return sorted(childrenByParent[nil, default: []]).map(build)
+    }
+
     public mutating func openFile(rootID: String, path: String, content: String, tokens: [SyntaxToken] = []) {
         let tab = FileTab(rootID: rootID, path: path, content: content, tokens: tokens)
         if let existing = openTabs.firstIndex(where: { $0.id == tab.id }) {
@@ -102,6 +161,49 @@ public struct WorkspaceViewState: Equatable, Sendable {
         let count = openTabs.count
         let next = ((index + step) % count + count) % count
         selectedTabID = openTabs[next].id
+    }
+
+    private static func parentPath(for path: String) -> String? {
+        guard let slash = path.lastIndex(of: "/") else {
+            return nil
+        }
+        return String(path[..<slash])
+    }
+
+    private static func name(for path: String) -> String {
+        path.split(separator: "/").last.map(String.init) ?? path
+    }
+
+    private func sorted(_ nodes: [WorkspaceTreeNode]) -> [WorkspaceTreeNode] {
+        nodes.sorted { lhs, rhs in
+            if lhs.isDirectory != rhs.isDirectory {
+                return lhs.isDirectory
+            }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+}
+
+public struct WorkspaceTreeNode: Equatable, Identifiable, Sendable {
+    public var id: String { entry.id }
+    public var rootId: String { entry.rootId }
+    public var rootPath: String { entry.rootPath }
+    public var path: String { entry.path }
+    public var name: String { entry.name }
+    public var kind: String { entry.kind }
+    public var isDirectory: Bool { entry.isDirectory }
+    public var children: [WorkspaceTreeNode]
+
+    public let entry: WorkspaceEntry
+
+    public init(entry: WorkspaceEntry, children: [WorkspaceTreeNode]) {
+        self.entry = entry
+        self.children = children
+    }
+
+    public init(rootId: String, rootPath: String, path: String, name: String, kind: String, children: [WorkspaceTreeNode]) {
+        self.entry = WorkspaceEntry(rootId: rootId, rootPath: rootPath, path: path, name: name, kind: kind)
+        self.children = children
     }
 }
 
