@@ -58,6 +58,11 @@ struct CodeTextView: NSViewRepresentable {
         scrollView.hasHorizontalScroller = true
         scrollView.borderType = .noBorder
         scrollView.documentView = textView
+
+        let ruler = LineNumberRulerView(textView: textView, scrollView: scrollView)
+        scrollView.verticalRulerView = ruler
+        scrollView.hasVerticalRuler = true
+        scrollView.rulersVisible = true
         return scrollView
     }
 
@@ -94,6 +99,13 @@ struct CodeTextView: NSViewRepresentable {
             textView.textContainerInset = NSSize(width: CGFloat(inset), height: CGFloat(inset))
             textView.lastScrolledLine = nil
             context.coordinator.lastStyleSignature = signature
+
+            if let ruler = scrollView.verticalRulerView as? LineNumberRulerView {
+                ruler.gutterFont = .monospacedSystemFont(ofSize: codeFont.pointSize * 0.85, weight: .regular)
+                ruler.gutterBackgroundColor = ReadingThemeAppKit.backgroundColor(for: theme)
+                ruler.numberColor = ReadingThemeAppKit.foregroundColor(for: theme).withAlphaComponent(0.45)
+                ruler.refresh(for: content)
+            }
         }
         if let line = scrollToLine, line != textView.lastScrolledLine {
             textView.scrollToLine(line)
