@@ -61,4 +61,11 @@ final class ShortcutCatalogTests: XCTestCase {
         XCTAssertEqual(hint?.label, "Go to Line")
         XCTAssertEqual(hint?.chord.display, "⌃G")
     }
+
+    func testGoToSymbolHintIsRegistered() {
+        let hint = ShortcutCatalog.hint("goToSymbol")
+        XCTAssertEqual(hint?.category, .navigation)
+        XCTAssertEqual(hint?.label, "Go to Symbol in File")
+        XCTAssertEqual(hint?.chord.display, "⇧⌘O")
+    }
 }

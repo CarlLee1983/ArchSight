@@ -14,6 +14,7 @@ struct WorkspaceCommandActions {
     var selectTab: (Int) -> Void = { _ in }
     var quickOpen: () -> Void = {}
     var goToLine: () -> Void = {}
+    var goToSymbol: () -> Void = {}
     var goBack: () -> Void = {}
     var goForward: () -> Void = {}
     var nextTab: () -> Void = {}
@@ -83,6 +84,9 @@ struct WorkspaceMenuCommands: Commands {
                 .disabled(actions == nil)
             Button("Go to Line…") { actions?.goToLine() }
                 .keyboardShortcut("g", modifiers: .control)
+                .disabled(actions == nil)
+            Button("Go to Symbol in File…") { actions?.goToSymbol() }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
                 .disabled(actions == nil)
             Divider()
             Button("Back") { actions?.goBack() }

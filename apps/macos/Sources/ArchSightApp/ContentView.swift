@@ -33,6 +33,9 @@ struct ContentView: View {
     @State private var isQuickOpenPresented = false
     @State private var isShortcutsPresented = false
     @State private var isGoToLinePresented = false
+    @State private var isGoToSymbolPresented = false
+    @State private var documentSymbols: [DocumentSymbol] = []
+    @State private var isLoadingSymbols = false
     @Environment(ReadingPreferencesStore.self) private var readingStore
     @Environment(RecentFoldersStore.self) private var recentStore
     @Environment(AppCore.self) private var appCore
@@ -107,6 +110,25 @@ struct ContentView: View {
                 }
             }
         }
+        .overlay {
+            if isGoToSymbolPresented {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.12)
+                        .ignoresSafeArea()
+                        .onTapGesture { isGoToSymbolPresented = false }
+                    GoToSymbolPanel(
+                        symbols: documentSymbols,
+                        isLoading: isLoadingSymbols,
+                        onGo: { symbol in
+                            isGoToSymbolPresented = false
+                            pendingScrollLine = symbol.line
+                        },
+                        onClose: { isGoToSymbolPresented = false }
+                    )
+                    .padding(.top, 40)
+                }
+            }
+        }
         .focusedValue(\.workspaceCommands, WorkspaceCommandActions(
             openFolder: { openFolderPicker() },
             openRecent: { openRecentPath($0) },
@@ -125,18 +147,17 @@ struct ContentView: View {
             collapseAll: { collapseAll() },
             selectTab: { number in selectTab(at: number) },
             quickOpen: {
-                isShortcutsPresented = false
-                isGoToLinePresented = false
+                dismissOverlays()
                 isQuickOpenPresented = true
             },
             goToLine: { presentGoToLine() },
+            goToSymbol: { presentGoToSymbol() },
             goBack: { goBack() },
             goForward: { goForward() },
             nextTab: { selectAndRecord { state.selectNextTab() } },
             previousTab: { selectAndRecord { state.selectPreviousTab() } },
             showShortcuts: {
-                isQuickOpenPresented = false
-                isGoToLinePresented = false
+                dismissOverlays()
                 isShortcutsPresented = true
             }
         ))
@@ -601,9 +622,52 @@ struct ContentView: View {
     /// other overlays are dismissed first so only one is visible at a time.
     private func presentGoToLine() {
         guard selectedTab != nil else { return }
+        dismissOverlays()
+        isGoToLinePresented = true
+    }
+
+    /// Presents the Go to Symbol overlay and kicks off a lazy documentSymbol fetch
+    /// for the open file. No-op without an open file.
+    private func presentGoToSymbol() {
+        guard let tab = selectedTab else { return }
+        dismissOverlays()
+        documentSymbols = []
+        isLoadingSymbols = true
+        isGoToSymbolPresented = true
+        fetchDocumentSymbols(for: tab)
+    }
+
+    private func dismissOverlays() {
         isQuickOpenPresented = false
         isShortcutsPresented = false
-        isGoToLinePresented = true
+        isGoToLinePresented = false
+        isGoToSymbolPresented = false
+    }
+
+    private func fetchDocumentSymbols(for tab: FileTab) {
+        guard let endpoint = coreEndpoint, let workspaceId = state.workspaceId else {
+            isLoadingSymbols = false
+            return
+        }
+        Task {
+            defer { isLoadingSymbols = false }
+            do {
+                let symbols = try await Task.detached {
+                    try endpoint.makeController().documentSymbols(
+                        workspaceId: workspaceId,
+                        rootId: tab.rootID,
+                        path: tab.path
+                    )
+                }.value
+                // Drop results if the user already dismissed or switched files.
+                guard isGoToSymbolPresented, selectedTab?.id == tab.id else { return }
+                documentSymbols = symbols
+            } catch {
+                guard isGoToSymbolPresented, selectedTab?.id == tab.id else { return }
+                state.errorMessage = Self.describe(error)
+                isGoToSymbolPresented = false
+            }
+        }
     }
 
     func openEntry(_ entry: WorkspaceEntry) {
