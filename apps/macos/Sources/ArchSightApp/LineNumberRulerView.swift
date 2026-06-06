@@ -76,15 +76,23 @@ final class LineNumberRulerView: NSRulerView {
         let visibleCharRange = layoutManager.characterRange(forGlyphRange: visibleGlyphRange, actualGlyphRange: nil)
         let maxChar = NSMaxRange(visibleCharRange)
 
+        // Baseline offset of the code glyph within its line fragment. Uniform for
+        // every line (same font + paragraph style), so cache the last real value
+        // to align the trailing empty line, which has no glyph to query.
+        var lastBaselineY: CGFloat?
+
         var lineIndex = lineStarts.lineIndex(forUTF16Offset: visibleCharRange.location)
         while lineIndex < lineStarts.offsets.count {
             let charStart = lineStarts.offsets[lineIndex]
             if charStart > maxChar { break }
 
             let fragmentRect: NSRect
+            var glyphBaselineY: CGFloat?
             if charStart < textLength {
                 let glyphIndex = layoutManager.glyphIndexForCharacter(at: charStart)
                 fragmentRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+                glyphBaselineY = layoutManager.location(forGlyphAt: glyphIndex).y
+                lastBaselineY = glyphBaselineY
             } else if layoutManager.extraLineFragmentTextContainer != nil {
                 // Trailing empty line (final newline) or an empty document.
                 fragmentRect = layoutManager.extraLineFragmentRect
@@ -97,7 +105,21 @@ final class LineNumberRulerView: NSRulerView {
             let lineAttributes = isCurrent ? currentAttributes : attributes
             let size = label.size(withAttributes: lineAttributes)
             let drawX = ruleThickness - size.width - 6
-            let drawY = relativePoint.y + fragmentRect.minY + inset.height + (fragmentRect.height - size.height) / 2
+            let drawY: CGFloat
+            if let baselineY = glyphBaselineY ?? lastBaselineY {
+                // Align the number's baseline to the code baseline (correct for any
+                // line height; centering drifts under lineHeightMultiple > 1).
+                drawY = GutterLayout.numberDrawY(
+                    relativeOriginY: relativePoint.y,
+                    fragmentMinY: fragmentRect.minY,
+                    insetHeight: inset.height,
+                    glyphBaselineY: baselineY,
+                    gutterAscender: gutterFont.ascender
+                )
+            } else {
+                // Degenerate empty document: no glyph ever seen, fall back to center.
+                drawY = relativePoint.y + fragmentRect.minY + inset.height + (fragmentRect.height - size.height) / 2
+            }
             label.draw(at: NSPoint(x: drawX, y: drawY), withAttributes: lineAttributes)
 
             lineIndex += 1
