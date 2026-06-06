@@ -68,21 +68,25 @@ public struct ReadingPreferences: Equatable, Sendable, Codable {
     public var fontScale: Double
     public var lineSpacing: LineSpacing
     public var tabLayoutMode: TabLayoutMode
+    /// Soft-wrap long lines in the code view (VSCode ⌥Z). Default OFF, matching VSCode.
+    public var wordWrap: Bool
 
-    public init(theme: ReadingThemeID, fontScale: Double, lineSpacing: LineSpacing, tabLayoutMode: TabLayoutMode = .verticalList) {
+    public init(theme: ReadingThemeID, fontScale: Double, lineSpacing: LineSpacing, tabLayoutMode: TabLayoutMode = .verticalList, wordWrap: Bool = false) {
         self.theme = theme
         self.fontScale = fontScale
         self.lineSpacing = lineSpacing
         self.tabLayoutMode = tabLayoutMode
+        self.wordWrap = wordWrap
     }
 
-    public static let `default` = ReadingPreferences(theme: .system, fontScale: 1.0, lineSpacing: .normal, tabLayoutMode: .verticalList)
+    public static let `default` = ReadingPreferences(theme: .system, fontScale: 1.0, lineSpacing: .normal, tabLayoutMode: .verticalList, wordWrap: false)
 
     private enum CodingKeys: String, CodingKey {
         case theme
         case fontScale
         case lineSpacing
         case tabLayoutMode
+        case wordWrap
     }
 
     public init(from decoder: Decoder) throws {
@@ -91,6 +95,7 @@ public struct ReadingPreferences: Equatable, Sendable, Codable {
         self.fontScale = try container.decode(Double.self, forKey: .fontScale)
         self.lineSpacing = try container.decode(LineSpacing.self, forKey: .lineSpacing)
         self.tabLayoutMode = try container.decodeIfPresent(TabLayoutMode.self, forKey: .tabLayoutMode) ?? .verticalList
+        self.wordWrap = try container.decodeIfPresent(Bool.self, forKey: .wordWrap) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -99,6 +104,7 @@ public struct ReadingPreferences: Equatable, Sendable, Codable {
         try container.encode(fontScale, forKey: .fontScale)
         try container.encode(lineSpacing, forKey: .lineSpacing)
         try container.encode(tabLayoutMode, forKey: .tabLayoutMode)
+        try container.encode(wordWrap, forKey: .wordWrap)
     }
 
     /// Discrete font scale steps used by the A- / A+ controls.

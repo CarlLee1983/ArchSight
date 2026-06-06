@@ -72,6 +72,12 @@ struct WorkspaceMenuCommands: Commands {
                 .keyboardShortcut("0", modifiers: [.command, .option])
                 .disabled(actions == nil)
             Divider()
+            Toggle("Word Wrap", isOn: Binding(
+                get: { readingStore.preferences.wordWrap },
+                set: { _ in readingStore.toggleWordWrap() }
+            ))
+            .keyboardShortcut("z", modifiers: .option)
+            Divider()
             Button("Increase Text Size") { readingStore.increaseFont() }
                 .keyboardShortcut("=", modifiers: .command)
             Button("Decrease Text Size") { readingStore.decreaseFont() }

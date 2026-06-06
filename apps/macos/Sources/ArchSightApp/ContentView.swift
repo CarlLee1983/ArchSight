@@ -18,6 +18,7 @@ struct ContentView: View {
     enum SidebarTab: String, CaseIterable, Sendable {
         case explorer
         case search
+        case outline
     }
     @State var activeSidebarTab: SidebarTab = .explorer
     @State private var comparisonTabID: FileTab.ID?
@@ -36,6 +37,10 @@ struct ContentView: View {
     @State private var isGoToSymbolPresented = false
     @State private var documentSymbols: [DocumentSymbol] = []
     @State private var isLoadingSymbols = false
+    // Docked Outline panel (activity-bar tab). Separate from the ⇧⌘O overlay state so
+    // the two never interfere. Populated lazily — only while the Outline tab is active.
+    @State var outlineSymbols: [DocumentSymbol] = []
+    @State var isLoadingOutline = false
     @Environment(ReadingPreferencesStore.self) private var readingStore
     @Environment(RecentFoldersStore.self) private var recentStore
     @Environment(AppCore.self) private var appCore
@@ -161,6 +166,10 @@ struct ContentView: View {
                 isShortcutsPresented = true
             }
         ))
+        // Refresh the outline when the active file changes while the panel is open.
+        // Switching *to* the Outline tab (and re-showing the sidebar) is covered by
+        // OutlinePanel's onAppear, so we don't also observe activeSidebarTab here.
+        .onChange(of: state.selectedTabID) { _, _ in loadOutlineIfNeeded() }
     }
 
     // MARK: - Toolbar
@@ -170,20 +179,20 @@ struct ContentView: View {
         ToolbarItemGroup(placement: .navigation) {
             Button { goBack() } label: { Image(systemName: "chevron.left") }
                 .disabled(!history.canGoBack)
-                .help("Back \(ShortcutCatalog.hint("back")?.chord.display ?? "")")
+                .help(ShortcutCatalog.tooltip("Back", "back"))
             Button { goForward() } label: { Image(systemName: "chevron.right") }
                 .disabled(!history.canGoForward)
-                .help("Forward \(ShortcutCatalog.hint("forward")?.chord.display ?? "")")
+                .help(ShortcutCatalog.tooltip("Forward", "forward"))
         }
         ToolbarItemGroup {
             Button { openFolderPicker() } label: {
                 Label("Open Folder", systemImage: "folder.badge.plus")
             }
-            .help("Open Folder \(ShortcutCatalog.hint("openFolder")?.chord.display ?? "")")
+            .help(ShortcutCatalog.tooltip("Open Folder", "openFolder"))
             Toggle(isOn: $isSplit) {
                 Label("Split", systemImage: "rectangle.split.2x1")
             }
-            .help("Split Editor \(ShortcutCatalog.hint("splitEditor")?.chord.display ?? "") · compare two files")
+            .help("\(ShortcutCatalog.tooltip("Split Editor", "splitEditor")) · compare two files")
             if state.isLoading {
                 ProgressView().controlSize(.small)
             }
@@ -267,7 +276,7 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help("Go to Line \(ShortcutCatalog.hint("goToLine")?.chord.display ?? "")")
+                    .help(ShortcutCatalog.tooltip("Go to Line", "goToLine"))
 
                     Text(LanguageLabel.forPath(tab.path))
                         .font(.system(size: 10))
@@ -363,6 +372,14 @@ struct ContentView: View {
 
     @ViewBuilder
     private func filePane(for tab: FileTab, scrollLine: Int?, reportsCursor: Bool = false) -> some View {
+        VStack(spacing: 0) {
+            BreadcrumbBar(path: tab.path)
+            fileContent(for: tab, scrollLine: scrollLine, reportsCursor: reportsCursor)
+        }
+    }
+
+    @ViewBuilder
+    private func fileContent(for tab: FileTab, scrollLine: Int?, reportsCursor: Bool) -> some View {
         if tab.canPreviewMarkdown {
             VStack(spacing: 0) {
                 HStack {
@@ -456,7 +473,7 @@ struct ContentView: View {
 
     // MARK: - Derived
 
-    private var selectedTab: FileTab? {
+    var selectedTab: FileTab? {
         state.openTabs.first { $0.id == state.selectedTabID }
     }
 
@@ -668,6 +685,52 @@ struct ContentView: View {
                 isGoToSymbolPresented = false
             }
         }
+    }
+
+    /// Lazily (re)loads the Outline panel's symbols. Only fetches while the Outline
+    /// tab is the active sidebar tab — matching the lazy-LSP policy: no symbol traffic
+    /// when the panel isn't on screen. Clears when there is no open file.
+    func loadOutlineIfNeeded() {
+        guard activeSidebarTab == .outline else { return }
+        guard let tab = selectedTab else {
+            outlineSymbols = []
+            isLoadingOutline = false
+            return
+        }
+        fetchOutlineSymbols(for: tab)
+    }
+
+    private func fetchOutlineSymbols(for tab: FileTab) {
+        guard let endpoint = coreEndpoint, let workspaceId = state.workspaceId else {
+            outlineSymbols = []
+            isLoadingOutline = false
+            return
+        }
+        outlineSymbols = []
+        isLoadingOutline = true
+        Task {
+            defer { isLoadingOutline = false }
+            do {
+                let symbols = try await Task.detached {
+                    try endpoint.makeController().documentSymbols(
+                        workspaceId: workspaceId,
+                        rootId: tab.rootID,
+                        path: tab.path
+                    )
+                }.value
+                // Drop stale results if the user switched files or left the Outline tab.
+                guard activeSidebarTab == .outline, selectedTab?.id == tab.id else { return }
+                outlineSymbols = symbols
+            } catch {
+                guard activeSidebarTab == .outline, selectedTab?.id == tab.id else { return }
+                outlineSymbols = []
+            }
+        }
+    }
+
+    /// Navigates the active editor to a symbol picked from the Outline panel.
+    func goToOutlineSymbol(_ symbol: DocumentSymbol) {
+        pendingScrollLine = symbol.line
     }
 
     func openEntry(_ entry: WorkspaceEntry) {

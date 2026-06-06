@@ -18,6 +18,15 @@ final class LineNumberRulerView: NSRulerView {
     var gutterBackgroundColor: NSColor = .textBackgroundColor {
         didSet { needsDisplay = true }
     }
+    /// Full-opacity color for the caret's line number (VSCode highlights the active
+    /// line number brighter than the dimmed rest). Set alongside `numberColor`.
+    var currentNumberColor: NSColor = .labelColor {
+        didSet { needsDisplay = true }
+    }
+    /// 1-based line of the caret, or nil when unknown. Drives the active-line emphasis.
+    var currentLine: Int? {
+        didSet { if oldValue != currentLine { needsDisplay = true } }
+    }
 
     init(textView: NSTextView, scrollView: NSScrollView) {
         self.codeTextView = textView
@@ -55,6 +64,10 @@ final class LineNumberRulerView: NSRulerView {
             .font: gutterFont,
             .foregroundColor: numberColor,
         ]
+        let currentAttributes: [NSAttributedString.Key: Any] = [
+            .font: gutterFont,
+            .foregroundColor: currentNumberColor,
+        ]
         let inset = textView.textContainerInset
         let relativePoint = convert(NSPoint.zero, from: textView)
         let textLength = (textView.string as NSString).length
@@ -80,10 +93,12 @@ final class LineNumberRulerView: NSRulerView {
             }
 
             let label = "\(lineIndex + 1)" as NSString
-            let size = label.size(withAttributes: attributes)
+            let isCurrent = (lineIndex + 1) == currentLine
+            let lineAttributes = isCurrent ? currentAttributes : attributes
+            let size = label.size(withAttributes: lineAttributes)
             let drawX = ruleThickness - size.width - 6
             let drawY = relativePoint.y + fragmentRect.minY + inset.height + (fragmentRect.height - size.height) / 2
-            label.draw(at: NSPoint(x: drawX, y: drawY), withAttributes: attributes)
+            label.draw(at: NSPoint(x: drawX, y: drawY), withAttributes: lineAttributes)
 
             lineIndex += 1
         }

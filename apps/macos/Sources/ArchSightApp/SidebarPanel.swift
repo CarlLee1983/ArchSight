@@ -20,7 +20,7 @@ extension ContentView {
                 .cornerRadius(6)
             }
             .buttonStyle(.plain)
-            .help("File Explorer")
+            .help(ShortcutCatalog.tooltip("File Explorer", "showExplorer"))
             .overlay(alignment: .leading) {
                 if activeSidebarTab == .explorer {
                     Rectangle()
@@ -39,9 +39,30 @@ extension ContentView {
                 .cornerRadius(6)
             }
             .buttonStyle(.plain)
-            .help("Search in Workspace")
+            .help(ShortcutCatalog.tooltip("Search in Workspace", "showSearch"))
             .overlay(alignment: .leading) {
                 if activeSidebarTab == .search {
+                    Rectangle()
+                        .fill(Color.accentColor)
+                        .frame(width: 2, height: 20)
+                }
+            }
+
+            // Outline Tab
+            Button { handleTabClick(.outline) } label: {
+                VStack {
+                    Image(systemName: "list.bullet.indent")
+                        .font(.system(size: 16))
+                        .foregroundStyle(activeSidebarTab == .outline ? Color.accentColor : .secondary)
+                }
+                .frame(width: 36, height: 36)
+                .background(activeSidebarTab == .outline ? Color.secondary.opacity(0.15) : Color.clear)
+                .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .help("Outline")
+            .overlay(alignment: .leading) {
+                if activeSidebarTab == .outline {
                     Rectangle()
                         .fill(Color.accentColor)
                         .frame(width: 2, height: 20)
@@ -137,6 +158,15 @@ extension ContentView {
 
                     searchResultsList
                 }
+
+            case .outline:
+                OutlinePanel(
+                    symbols: outlineSymbols,
+                    isLoading: isLoadingOutline,
+                    hasOpenFile: selectedTab != nil,
+                    onSelect: { goToOutlineSymbol($0) }
+                )
+                .onAppear { loadOutlineIfNeeded() }
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
@@ -154,7 +184,7 @@ extension ContentView {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .help("Collapse Folders \(ShortcutCatalog.hint("collapseFolders")?.chord.display ?? "")")
+            .help(ShortcutCatalog.tooltip("Collapse Folders", "collapseFolders"))
         }
         .padding(.horizontal, 12)
         .padding(.top, 10)

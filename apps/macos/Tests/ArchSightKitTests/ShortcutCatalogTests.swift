@@ -68,4 +68,30 @@ final class ShortcutCatalogTests: XCTestCase {
         XCTAssertEqual(hint?.label, "Go to Symbol in File")
         XCTAssertEqual(hint?.chord.display, "⇧⌘O")
     }
+
+    func testTooltipAppendsChordInParenthesesWhenHintExists() {
+        // VSCode-style: "Label (⇧⌘E)".
+        XCTAssertEqual(ShortcutCatalog.tooltip("Back", "back"), "Back (⌘[)")
+        XCTAssertEqual(ShortcutCatalog.tooltip("File Explorer", "showExplorer"), "File Explorer (⇧⌘E)")
+    }
+
+    func testTooltipReturnsBareLabelWhenHintMissing() {
+        // No trailing space, no empty parentheses when the id is unknown.
+        XCTAssertEqual(ShortcutCatalog.tooltip("Reading settings", "nope"), "Reading settings")
+    }
+
+    func testSidebarAndTabHintsAreRegistered() {
+        // Tooltips added in this branch must resolve to real chords.
+        XCTAssertEqual(ShortcutCatalog.hint("showSearch")?.chord.display, "⇧⌘F")
+        XCTAssertEqual(ShortcutCatalog.hint("closeTab")?.chord.display, "⌘W")
+        XCTAssertEqual(ShortcutCatalog.hint("increaseText")?.chord.display, "⌘=")
+        XCTAssertEqual(ShortcutCatalog.hint("decreaseText")?.chord.display, "⌘-")
+    }
+
+    func testWordWrapHintIsRegistered() {
+        let hint = ShortcutCatalog.hint("wordWrap")
+        XCTAssertEqual(hint?.category, .view)
+        XCTAssertEqual(hint?.label, "Toggle Word Wrap")
+        XCTAssertEqual(hint?.chord.display, "⌥Z") // VSCode's word-wrap chord on macOS
+    }
 }

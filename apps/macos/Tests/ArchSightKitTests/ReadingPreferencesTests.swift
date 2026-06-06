@@ -25,6 +25,15 @@ final class ReadingPreferencesTests: XCTestCase {
         XCTAssertEqual(prefs.theme, .system)
         XCTAssertEqual(prefs.fontScale, 1.0, accuracy: 0.001)
         XCTAssertEqual(prefs.lineSpacing, .normal)
+        XCTAssertFalse(prefs.wordWrap) // VSCode default is OFF
+    }
+
+    func testWordWrapSurvivesCodableRoundTrip() throws {
+        var prefs = ReadingPreferences.default
+        prefs.wordWrap = true
+        let data = try JSONEncoder().encode(prefs)
+        let decoded = try JSONDecoder().decode(ReadingPreferences.self, from: data)
+        XCTAssertTrue(decoded.wordWrap)
     }
 
     func testFontSteppingClampsAtBounds() {
@@ -79,5 +88,6 @@ final class ReadingPreferencesTests: XCTestCase {
         XCTAssertEqual(decoded.fontScale, 1.15, accuracy: 0.001)
         XCTAssertEqual(decoded.lineSpacing, .relaxed)
         XCTAssertEqual(decoded.tabLayoutMode, .verticalList)
+        XCTAssertFalse(decoded.wordWrap) // absent key decodes to the OFF default
     }
 }
