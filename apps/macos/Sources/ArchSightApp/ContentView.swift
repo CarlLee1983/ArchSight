@@ -4,29 +4,29 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @State private var state = WorkspaceViewState()
-    @State private var expandedPaths: Set<String> = []
+    @State var state = WorkspaceViewState()
+    @State var expandedPaths: Set<String> = []
     /// Root ids the user has collapsed. Empty = all roots expanded, so newly
     /// dragged-in folders default to expanded without seeding state.
-    @State private var collapsedRoots: Set<WorkspaceRoot.ID> = []
+    @State var collapsedRoots: Set<WorkspaceRoot.ID> = []
     @State private var activeSearchTask: Task<Void, Never>? = nil
 
-    @State private var history = NavigationHistory()
+    @State var history = NavigationHistory()
     @State private var isSplit = false
-    @State private var isSidebarVisible = true
+    @State var isSidebarVisible = true
 
-    private enum SidebarTab: String, CaseIterable, Sendable {
+    enum SidebarTab: String, CaseIterable, Sendable {
         case explorer
         case search
     }
-    @State private var activeSidebarTab: SidebarTab = .explorer
+    @State var activeSidebarTab: SidebarTab = .explorer
     @State private var comparisonTabID: FileTab.ID?
-    @State private var sidebarSelection: WorkspaceEntry.ID?
-    @State private var sidebarTreeNodes: [WorkspaceRoot.ID: [WorkspaceTreeNode]] = [:]
-    @State private var sidebarFileEntriesByID: [WorkspaceEntry.ID: WorkspaceEntry] = [:]
-    @State private var hoveredOpenTabID: FileTab.ID?
-    @State private var searchSelection: SearchMatch.ID?
-    @State private var pendingScrollLine: Int?
+    @State var sidebarSelection: WorkspaceEntry.ID?
+    @State var sidebarTreeNodes: [WorkspaceRoot.ID: [WorkspaceTreeNode]] = [:]
+    @State var sidebarFileEntriesByID: [WorkspaceEntry.ID: WorkspaceEntry] = [:]
+    @State var hoveredOpenTabID: FileTab.ID?
+    @State var searchSelection: SearchMatch.ID?
+    @State var pendingScrollLine: Int?
     @State private var markdownDisplayMode: MarkdownDisplayMode = .preview
     @State private var isQuickOpenPresented = false
     @State private var isShortcutsPresented = false
@@ -174,310 +174,6 @@ struct ContentView: View {
             .frame(width: 0, height: 0)
     }
 
-    // MARK: - Sidebar & Activity Bar Views
-
-    private var activityBar: some View {
-        VStack(spacing: 16) {
-            // Explorer Tab
-            Button { handleTabClick(.explorer) } label: {
-                VStack {
-                    ArchSightIcon.Explorer(color: activeSidebarTab == .explorer ? .accentColor : .secondary)
-                }
-                .frame(width: 36, height: 36)
-                .background(activeSidebarTab == .explorer ? Color.secondary.opacity(0.15) : Color.clear)
-                .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
-            .help("File Explorer")
-            .overlay(alignment: .leading) {
-                if activeSidebarTab == .explorer {
-                    Rectangle()
-                        .fill(Color.accentColor)
-                        .frame(width: 2, height: 20)
-                }
-            }
-            
-            // Search Tab
-            Button { handleTabClick(.search) } label: {
-                VStack {
-                    ArchSightIcon.Search(color: activeSidebarTab == .search ? .accentColor : .secondary)
-                }
-                .frame(width: 36, height: 36)
-                .background(activeSidebarTab == .search ? Color.secondary.opacity(0.15) : Color.clear)
-                .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
-            .help("Search in Workspace")
-            .overlay(alignment: .leading) {
-                if activeSidebarTab == .search {
-                    Rectangle()
-                        .fill(Color.accentColor)
-                        .frame(width: 2, height: 20)
-                }
-            }
-            
-            Spacer()
-        }
-        .padding(.top, 8)
-        .padding(.horizontal, 6)
-        .frame(width: 48)
-        .background(Color(NSColor.controlBackgroundColor))
-    }
-
-    @ViewBuilder
-    private var sidebarPanel: some View {
-        VStack(spacing: 0) {
-            switch activeSidebarTab {
-            case .explorer:
-                if !state.openTabs.isEmpty {
-                    openFilesPanel
-                }
-
-                if !state.roots.isEmpty {
-                    foldersHeader
-                }
-
-                List(selection: $sidebarSelection) {
-                    ForEach(state.roots) { root in
-                        let rootExpanded = Binding<Bool>(
-                            get: { !collapsedRoots.contains(root.id) },
-                            set: { expanded in
-                                if expanded {
-                                    collapsedRoots.remove(root.id)
-                                } else {
-                                    collapsedRoots.insert(root.id)
-                                }
-                            }
-                        )
-                        Section(root.name, isExpanded: rootExpanded) {
-                            let nodes = sidebarTreeNodes[root.id, default: []]
-                            if nodes.isEmpty {
-                                Text("No files")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                ForEach(nodes) { node in
-                                    sidebarNode(node)
-                                }
-                            }
-                        }
-                        .contextMenu {
-                            Button("Reveal in Finder") { FileSystemActions.revealInFinder(path: root.path) }
-                            Button("Copy Path") { FileSystemActions.copyToPasteboard(root.path) }
-                            Divider()
-                            Button("Remove Folder from Workspace") { removeRoot(root) }
-                            Divider()
-                            Button("Close All Folders") { closeWorkspace() }
-                        }
-                    }
-                }
-                .listStyle(.sidebar)
-                .scrollContentBackground(.hidden)
-                .onChange(of: sidebarSelection) { _, newSelection in
-                    guard let id = newSelection,
-                          let entry = sidebarFileEntriesByID[id]
-                    else {
-                        return
-                    }
-                    openEntry(entry)
-                }
-                .onKeyPress(.return) {
-                    openSelectedSidebarEntry()
-                    return .handled
-                }
-                .overlay {
-                    if state.roots.isEmpty {
-                        ContentUnavailableView("No Workspace", systemImage: "folder")
-                    }
-                }
-                
-            case .search:
-                VStack(spacing: 8) {
-                    HStack {
-                        TextField("Search Pattern", text: $state.searchQuery)
-                            .textFieldStyle(.roundedBorder)
-                            .onSubmit { runSearch() }
-                        Button { runSearch() } label: {
-                            Text("Go")
-                        }
-                    }
-                    .padding(8)
-                    
-                    searchResultsList
-                }
-            }
-        }
-        .background(Color(NSColor.windowBackgroundColor))
-    }
-
-    private var foldersHeader: some View {
-        HStack(spacing: 6) {
-            Text("FOLDERS")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundColor(.secondary)
-            Spacer()
-            Button(action: collapseAll) {
-                Image(systemName: "rectangle.compress.vertical")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Collapse Folders \(ShortcutCatalog.hint("collapseFolders")?.chord.display ?? "")")
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
-    }
-
-    private var openFilesPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("OPEN FILES")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
-
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(state.openTabs) { tab in
-                        openFileRow(tab)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.bottom, 8)
-            }
-            .frame(maxHeight: 154)
-
-            Divider().opacity(0.6)
-        }
-    }
-
-    private func openFileRow(_ tab: FileTab) -> some View {
-        let fileName = (tab.path as NSString).lastPathComponent
-        let isSelected = state.selectedTabID == tab.id
-        let isHovered = hoveredOpenTabID == tab.id
-
-        return HStack(spacing: 8) {
-            FileIconMapper.iconType(for: fileName).view()
-            Text(fileName)
-                .font(.system(size: 11, design: .monospaced))
-                .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundColor(isSelected ? .primary : .secondary)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            Button {
-                state.closeTab(id: tab.id)
-                if hoveredOpenTabID == tab.id {
-                    hoveredOpenTabID = nil
-                }
-            } label: {
-                ArchSightIcon.Close(color: isSelected ? .primary : .secondary)
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
-                    .background(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(isHovered ? Color.secondary.opacity(0.16) : Color.clear)
-                    )
-            }
-            .buttonStyle(.plain)
-            .help("Close")
-        }
-        .padding(.horizontal, 8)
-        .frame(height: 30)
-        .background(isSelected ? Color.accentColor.opacity(0.16) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .contentShape(Rectangle())
-        .onHover { isHovering in
-            hoveredOpenTabID = isHovering ? tab.id : nil
-        }
-        .onTapGesture {
-            state.selectedTabID = tab.id
-            history.visit(tab.id)
-            pendingScrollLine = nil
-        }
-    }
-
-    private func sidebarNode(_ node: WorkspaceTreeNode) -> AnyView {
-        if node.isDirectory {
-            let isExpandedBinding = Binding<Bool>(
-                get: { expandedPaths.contains(node.path) },
-                set: { isExpanded in
-                    if isExpanded {
-                        expandedPaths.insert(node.path)
-                    } else {
-                        expandedPaths.remove(node.path)
-                    }
-                }
-            )
-            let isExpanded = expandedPaths.contains(node.path)
-            return AnyView(DisclosureGroup(isExpanded: isExpandedBinding) {
-                ForEach(node.children) { child in
-                    sidebarNode(child)
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    if isExpanded {
-                        ArchSightIcon.FolderOpen()
-                    } else {
-                        ArchSightIcon.Folder()
-                    }
-                    Text(node.name)
-                        .font(.system(.caption, design: .default))
-                }
-                .help(node.path)
-                .contextMenu { entryContextMenu(path: node.path, rootPath: node.rootPath) }
-            })
-        } else {
-            return AnyView(
-                HStack(spacing: 6) {
-                    FileIconMapper.iconType(for: node.name).view()
-                    Text(node.name)
-                        .font(.system(.caption, design: .monospaced))
-                }
-                .help(node.path)
-                .tag(node.entry.id)
-                .contentShape(Rectangle())
-                .contextMenu { entryContextMenu(path: node.path, rootPath: node.rootPath) }
-            )
-        }
-    }
-
-    @ViewBuilder
-    private func entryContextMenu(path: String, rootPath: String) -> some View {
-        Button("Reveal in Finder") { FileSystemActions.revealInFinder(path: path) }
-        Divider()
-        Button("Copy Path") { FileSystemActions.copyToPasteboard(path) }
-        Button("Copy Relative Path") {
-            FileSystemActions.copyToPasteboard(FileSystemPaths.relative(of: path, under: rootPath))
-        }
-    }
-
-    private var searchResultsList: some View {
-        List(selection: $searchSelection) {
-            Section("Search Results (\(state.searchResults.count))") {
-                ForEach(state.searchResults) { match in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(match.path):\(match.line)")
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                        Text(match.preview)
-                            .font(.system(.caption, design: .monospaced))
-                            .lineLimit(1)
-                    }
-                    .tag(match.id)
-                    .onTapGesture(count: 2) { openMatch(match) }
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
-        .onKeyPress(.return) {
-            openSelectedSearchMatch()
-            return .handled
-        }
-    }
-
     private var statusBar: some View {
         VStack(spacing: 0) {
             Divider()
@@ -519,19 +215,6 @@ struct ContentView: View {
             .padding(.horizontal, 12)
             .frame(height: 22)
             .background(Color(NSColor.windowBackgroundColor))
-        }
-    }
-
-    private func handleTabClick(_ tab: SidebarTab) {
-        if activeSidebarTab == tab {
-            withAnimation(.easeInOut(duration: 0.16)) {
-                isSidebarVisible.toggle()
-            }
-        } else {
-            activeSidebarTab = tab
-            withAnimation(.easeInOut(duration: 0.16)) {
-                isSidebarVisible = true
-            }
         }
     }
 
@@ -811,7 +494,7 @@ struct ContentView: View {
         }
     }
 
-    private func removeRoot(_ root: WorkspaceRoot) {
+    func removeRoot(_ root: WorkspaceRoot) {
         // Drop the tabs/selection locally first so the UI updates immediately,
         // then tell the core to forget the root and refresh from the result.
         expandedPaths = expandedPaths.filter { path in
@@ -835,21 +518,21 @@ struct ContentView: View {
         }
     }
 
-    private func closeWorkspace() {
+    func closeWorkspace() {
         expandedPaths = []
         collapsedRoots = []
         state.closeWorkspace()
         refreshSidebarTreeNodes()
     }
 
-    private func collapseAll() {
+    func collapseAll() {
         // Match VSCode "Collapse Folders in Explorer": collapse nested folders
         // and the root sections together.
         expandedPaths = []
         collapsedRoots = Set(state.roots.map(\.id))
     }
 
-    private func openEntry(_ entry: WorkspaceEntry) {
+    func openEntry(_ entry: WorkspaceEntry) {
         sidebarSelection = entry.id
         loadFile(rootId: entry.rootId, path: entry.path, scrollLine: nil)
     }
@@ -867,7 +550,7 @@ struct ContentView: View {
         )
     }
 
-    private func openMatch(_ match: SearchMatch) {
+    func openMatch(_ match: SearchMatch) {
         loadFile(rootId: match.rootId, path: match.path, scrollLine: match.line)
     }
 
@@ -940,7 +623,7 @@ struct ContentView: View {
         }
     }
 
-    private func runSearch() {
+    func runSearch() {
         activeSearchTask?.cancel()
         guard let endpoint = coreEndpoint, let workspaceId = state.workspaceId else { return }
         let pattern = state.searchQuery
@@ -967,7 +650,7 @@ struct ContentView: View {
 
     // MARK: - Keyboard navigation helpers
 
-    private func openSelectedSidebarEntry() {
+    func openSelectedSidebarEntry() {
         guard let id = sidebarSelection,
               let entry = sidebarFileEntriesByID[id]
         else {
@@ -976,7 +659,7 @@ struct ContentView: View {
         openEntry(entry)
     }
 
-    private func openSelectedSearchMatch() {
+    func openSelectedSearchMatch() {
         guard let id = searchSelection,
               let match = state.searchResults.first(where: { $0.id == id })
         else {
