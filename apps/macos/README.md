@@ -11,6 +11,7 @@ Heavy filesystem scanning, search execution, syntax parsing, LSP process managem
 The shell currently provides:
 
 - **Workspace** — open one or more folders via the native picker or drag/drop; folders appear as a flattened, per-root collapsible collection in the Explorer sidebar.
+- **Recent folders** — opened folders are remembered (most-recent-first) and reopen in one click from File ▸ Open Recent or the welcome screen shown when no workspace is open; backed by `ArchSightKit/RecentFoldersStore`.
 - **Explorer sidebar** — activity bar toggles between Explorer and Search panels; an Open Files list, collapsible `FOLDERS` sections, and a Collapse Folders action.
 - **Sidebar context menus** — right-click a root for Reveal in Finder / Copy Path / Remove Folder / Close All Folders; right-click any entry for Reveal in Finder / Copy Path / Copy Relative Path.
 - **Reading** — read-only file viewing with Tree-sitter syntax highlighting (served by `core/`), a Markdown preview/source toggle, and reading preferences (theme, text size, line spacing).
