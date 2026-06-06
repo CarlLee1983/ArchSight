@@ -71,6 +71,35 @@ dist/ArchSight.app/Contents/
   Resources/bin/rg               # bundled ripgrep
 ```
 
+## Distribution via Homebrew cask
+
+ArchSight ships as a Homebrew cask, not a formula. `scripts/release.sh` builds
+the bundle, zips it with `ditto` (which preserves the bundle layout, symlinks,
+extended attributes, and code signature), computes the SHA-256, and patches
+`Casks/archsight.rb` with the new `version` and `sha256`:
+
+```sh
+scripts/release.sh             # build + zip + sha256 + patch the cask
+scripts/release.sh --no-build  # reuse an existing dist/ArchSight.app
+```
+
+It then prints the manual publish steps: create a GitHub Release tagged
+`v<version>` with the zip attached, and push the patched cask to a personal tap.
+
+Two constraints drive this layout:
+
+- **The cask must live in your own tap** (e.g. `CarlLee1983/homebrew-tap`). The
+  official `homebrew/cask` repository does not accept apps that are not
+  Developer ID signed and notarized.
+- **The bundle is currently ad-hoc signed and not notarized.** Modern Homebrew
+  *adds* the `com.apple.quarantine` attribute on cask installs and has **removed
+  the `--no-quarantine` flag**, so Gatekeeper blocks the first launch. Users
+  clear the flag once after install (the cask `caveats` spell this out):
+  `xattr -dr com.apple.quarantine /Applications/ArchSight.app` — or open it once
+  via right-click > Open. Notarizing the bundle (requires a paid Apple Developer
+  Program membership) removes this step and is the prerequisite for ever
+  submitting to `homebrew/cask`.
+
 ## Binary resolution and development fallbacks
 
 Both the shell and the core resolve their helper binaries in the same order:
