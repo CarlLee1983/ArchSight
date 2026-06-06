@@ -222,10 +222,12 @@ func TestServerDefinitionRejectsFileOutsideSnapshot(t *testing.T) {
 type recordingNavigator struct {
 	definitionCalls     int
 	referencesCalls     int
+	documentSymbolCalls int
 	shutdownCalls       int
 	lastRequest         lsp.Request
 	definitionLocations []lsp.Location
 	referencesLocations []lsp.Location
+	documentSymbols     []lsp.Symbol
 }
 
 func (n *recordingNavigator) Definition(_ context.Context, req lsp.Request) ([]lsp.Location, error) {
@@ -238,6 +240,12 @@ func (n *recordingNavigator) References(_ context.Context, req lsp.Request) ([]l
 	n.referencesCalls++
 	n.lastRequest = req
 	return n.referencesLocations, nil
+}
+
+func (n *recordingNavigator) DocumentSymbol(_ context.Context, req lsp.Request) ([]lsp.Symbol, error) {
+	n.documentSymbolCalls++
+	n.lastRequest = req
+	return n.documentSymbols, nil
 }
 
 func (n *recordingNavigator) Shutdown() {

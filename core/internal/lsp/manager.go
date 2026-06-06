@@ -45,6 +45,7 @@ type Manager struct {
 type Navigator interface {
 	Definition(context.Context, Request) ([]Location, error)
 	References(context.Context, Request) ([]Location, error)
+	DocumentSymbol(context.Context, Request) ([]Symbol, error)
 }
 
 type Request struct {
@@ -63,6 +64,18 @@ type Location struct {
 	StartColumn int    `json:"startColumn"`
 	EndLine     int    `json:"endLine"`
 	EndColumn   int    `json:"endColumn"`
+}
+
+// Symbol is one entry of a file's document outline, flattened from the LSP
+// response. Depth records nesting (0 = top level) so the client can indent a
+// hierarchical outline without re-deriving structure.
+type Symbol struct {
+	Name   string `json:"name"`
+	Kind   int    `json:"kind"`
+	Detail string `json:"detail,omitempty"`
+	Line   int    `json:"line"`
+	Column int    `json:"column"`
+	Depth  int    `json:"depth"`
 }
 
 type Error struct {
@@ -127,6 +140,30 @@ func (m *Manager) References(ctx context.Context, req Request) ([]Location, erro
 	return m.navigation(ctx, server, req, "textDocument/references", map[string]any{
 		"context": map[string]any{"includeDeclaration": true},
 	})
+}
+
+// DocumentSymbol returns the file's outline. Like Definition/References it lazily
+// starts the language server and opens the file; unlike them it needs no caret
+// position because the request is whole-file.
+func (m *Manager) DocumentSymbol(ctx context.Context, req Request) ([]Symbol, error) {
+	server, err := m.ensureServer(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := didOpen(server, req); err != nil {
+		return nil, err
+	}
+	params := map[string]any{
+		"textDocument": map[string]any{"uri": fileURI(filepath.Join(req.Root.Path, req.Path))},
+	}
+	result, err := request(server, "textDocument/documentSymbol", params)
+	if err != nil {
+		return nil, err
+	}
+	return parseSymbols(result), nil
 }
 
 func (m *Manager) StopIdle() {
@@ -249,8 +286,9 @@ func initialize(ctx context.Context, server *serverProcess, root workspace.Root)
 		"rootUri":   fileURI(root.Path),
 		"capabilities": map[string]any{
 			"textDocument": map[string]any{
-				"definition": map[string]any{},
-				"references": map[string]any{},
+				"definition":     map[string]any{},
+				"references":     map[string]any{},
+				"documentSymbol": map[string]any{},
 			},
 		},
 	}
@@ -426,6 +464,86 @@ func convertLocation(root workspace.Root, loc protocolLocation) (Location, error
 		EndLine:     loc.Range.End.Line + 1,
 		EndColumn:   loc.Range.End.Character + 1,
 	}, nil
+}
+
+type lspPosition struct {
+	Line      int `json:"line"`
+	Character int `json:"character"`
+}
+
+type lspRange struct {
+	Start lspPosition `json:"start"`
+	End   lspPosition `json:"end"`
+}
+
+// protocolDocumentSymbol is the hierarchical `DocumentSymbol` shape. SelectionRange
+// is a pointer so its absence distinguishes this from the flat SymbolInformation.
+type protocolDocumentSymbol struct {
+	Name           string                   `json:"name"`
+	Detail         string                   `json:"detail"`
+	Kind           int                      `json:"kind"`
+	Range          lspRange                 `json:"range"`
+	SelectionRange *lspRange                `json:"selectionRange"`
+	Children       []protocolDocumentSymbol `json:"children"`
+}
+
+type protocolSymbolInformation struct {
+	Name     string `json:"name"`
+	Kind     int    `json:"kind"`
+	Location struct {
+		URI   string   `json:"uri"`
+		Range lspRange `json:"range"`
+	} `json:"location"`
+}
+
+// parseSymbols handles both LSP documentSymbol shapes: hierarchical
+// `DocumentSymbol[]` (flattened depth-first with depth tracking) and flat
+// `SymbolInformation[]`. A null/empty result yields an empty slice.
+func parseSymbols(result json.RawMessage) []Symbol {
+	if len(result) == 0 || string(result) == "null" {
+		return []Symbol{}
+	}
+	var hierarchical []protocolDocumentSymbol
+	if err := json.Unmarshal(result, &hierarchical); err == nil &&
+		len(hierarchical) > 0 && hierarchical[0].SelectionRange != nil {
+		symbols := []Symbol{}
+		for _, node := range hierarchical {
+			flattenSymbol(node, 0, &symbols)
+		}
+		return symbols
+	}
+	var flat []protocolSymbolInformation
+	if err := json.Unmarshal(result, &flat); err != nil {
+		return []Symbol{}
+	}
+	symbols := make([]Symbol, 0, len(flat))
+	for _, item := range flat {
+		symbols = append(symbols, Symbol{
+			Name:   item.Name,
+			Kind:   item.Kind,
+			Line:   item.Location.Range.Start.Line + 1,
+			Column: item.Location.Range.Start.Character + 1,
+		})
+	}
+	return symbols
+}
+
+func flattenSymbol(node protocolDocumentSymbol, depth int, out *[]Symbol) {
+	position := node.Range.Start
+	if node.SelectionRange != nil {
+		position = node.SelectionRange.Start
+	}
+	*out = append(*out, Symbol{
+		Name:   node.Name,
+		Kind:   node.Kind,
+		Detail: node.Detail,
+		Line:   position.Line + 1,
+		Column: position.Character + 1,
+		Depth:  depth,
+	})
+	for _, child := range node.Children {
+		flattenSymbol(child, depth+1, out)
+	}
 }
 
 func fileURI(path string) string {
