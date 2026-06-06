@@ -49,11 +49,12 @@ struct WorkspaceMenuCommands: Commands {
                 ForEach(recents) { folder in
                     Button(folder.name) { actions?.openRecent(folder.path) }
                         .help(folder.path)
+                        .disabled(actions == nil)
                 }
                 Divider()
                 Button("Clear Menu") { recentStore.clear() }
             }
-            .disabled(actions == nil || recents.isEmpty)
+            .disabled(recents.isEmpty)
         }
 
         CommandGroup(after: .sidebar) {

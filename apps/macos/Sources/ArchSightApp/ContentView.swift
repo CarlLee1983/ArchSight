@@ -499,7 +499,8 @@ struct ContentView: View {
                     try endpoint.makeController().addRoots(workspaceId: workspaceId, paths: paths)
                 }.value
                 state.roots = result.roots
-                result.roots.forEach { recentStore.record(path: $0.path) }
+                let freshSet = Set(paths)
+                result.roots.filter { freshSet.contains($0.path) }.forEach { recentStore.record(path: $0.path) }
                 state.entries = result.entries
                 refreshSidebarTreeNodes()
                 state.isLoading = false
