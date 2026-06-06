@@ -13,6 +13,7 @@ struct WorkspaceCommandActions {
     var collapseAll: () -> Void = {}
     var selectTab: (Int) -> Void = { _ in }
     var quickOpen: () -> Void = {}
+    var goToLine: () -> Void = {}
     var goBack: () -> Void = {}
     var goForward: () -> Void = {}
     var nextTab: () -> Void = {}
@@ -79,6 +80,9 @@ struct WorkspaceMenuCommands: Commands {
         CommandMenu("Go") {
             Button("Quick Open…") { actions?.quickOpen() }
                 .keyboardShortcut("p", modifiers: .command)
+                .disabled(actions == nil)
+            Button("Go to Line…") { actions?.goToLine() }
+                .keyboardShortcut("g", modifiers: .control)
                 .disabled(actions == nil)
             Divider()
             Button("Back") { actions?.goBack() }

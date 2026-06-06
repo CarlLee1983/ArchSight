@@ -75,6 +75,7 @@ public enum ShortcutCatalog {
         ShortcutHint(id: "newWindow", category: .navigation, label: "New Window", chord: KeyChord(key: "N", command: true)),
         ShortcutHint(id: "openFolder", category: .navigation, label: "Open Folder", chord: KeyChord(key: "O", command: true)),
         ShortcutHint(id: "quickOpen", category: .navigation, label: "Quick Open", chord: KeyChord(key: "P", command: true)),
+        ShortcutHint(id: "goToLine", category: .navigation, label: "Go to Line", chord: KeyChord(key: "G", control: true)),
         ShortcutHint(id: "findInFile", category: .navigation, label: "Find in File", chord: KeyChord(key: "F", command: true)), // AppKit native find bar (usesFindBar), not an explicit app binding
         ShortcutHint(id: "back", category: .navigation, label: "Back", chord: KeyChord(key: "[", command: true)),
         ShortcutHint(id: "forward", category: .navigation, label: "Forward", chord: KeyChord(key: "]", command: true)),

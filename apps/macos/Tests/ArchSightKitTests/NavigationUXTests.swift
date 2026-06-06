@@ -129,4 +129,20 @@ final class TextPositionTests: XCTestCase {
             XCTAssertEqual(back, offset, "round trip failed at offset \(offset)")
         }
     }
+
+    func testLineCountEmptyStringIsOne() {
+        XCTAssertEqual(TextPosition.lineCount(in: ""), 1)
+    }
+
+    func testLineCountSingleLine() {
+        XCTAssertEqual(TextPosition.lineCount(in: "let x = 1"), 1)
+    }
+
+    func testLineCountCountsNewlines() {
+        XCTAssertEqual(TextPosition.lineCount(in: "a\nb\nc"), 3)
+    }
+
+    func testLineCountTrailingNewlineAddsLine() {
+        XCTAssertEqual(TextPosition.lineCount(in: "a\n"), 2)
+    }
 }

@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var markdownDisplayMode: MarkdownDisplayMode = .preview
     @State private var isQuickOpenPresented = false
     @State private var isShortcutsPresented = false
+    @State private var isGoToLinePresented = false
     @Environment(ReadingPreferencesStore.self) private var readingStore
     @Environment(RecentFoldersStore.self) private var recentStore
     @Environment(AppCore.self) private var appCore
@@ -86,6 +87,24 @@ struct ContentView: View {
                 }
             }
         }
+        .overlay {
+            if isGoToLinePresented, let tab = selectedTab {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.12)
+                        .ignoresSafeArea()
+                        .onTapGesture { isGoToLinePresented = false }
+                    GoToLinePanel(
+                        totalLines: TextPosition.lineCount(in: tab.content),
+                        onGo: { line in
+                            isGoToLinePresented = false
+                            pendingScrollLine = line
+                        },
+                        onClose: { isGoToLinePresented = false }
+                    )
+                    .padding(.top, 40)
+                }
+            }
+        }
         .focusedValue(\.workspaceCommands, WorkspaceCommandActions(
             openFolder: { openFolderPicker() },
             openRecent: { openRecentPath($0) },
@@ -105,7 +124,14 @@ struct ContentView: View {
             selectTab: { number in selectTab(at: number) },
             quickOpen: {
                 isShortcutsPresented = false
+                isGoToLinePresented = false
                 isQuickOpenPresented = true
+            },
+            goToLine: {
+                guard selectedTab != nil else { return }
+                isQuickOpenPresented = false
+                isShortcutsPresented = false
+                isGoToLinePresented = true
             },
             goBack: { goBack() },
             goForward: { goForward() },
@@ -113,6 +139,7 @@ struct ContentView: View {
             previousTab: { selectAndRecord { state.selectPreviousTab() } },
             showShortcuts: {
                 isQuickOpenPresented = false
+                isGoToLinePresented = false
                 isShortcutsPresented = true
             }
         ))

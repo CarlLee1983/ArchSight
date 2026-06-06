@@ -54,4 +54,11 @@ final class ShortcutCatalogTests: XCTestCase {
         XCTAssertEqual(hint?.label, "Collapse Folders")
         XCTAssertEqual(hint?.chord.display, "⌥⌘0")
     }
+
+    func testGoToLineHintIsRegistered() {
+        let hint = ShortcutCatalog.hint("goToLine")
+        XCTAssertEqual(hint?.category, .navigation)
+        XCTAssertEqual(hint?.label, "Go to Line")
+        XCTAssertEqual(hint?.chord.display, "⌃G")
+    }
 }
