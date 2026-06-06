@@ -88,7 +88,7 @@ struct ContentView: View {
         }
         .focusedValue(\.workspaceCommands, WorkspaceCommandActions(
             openFolder: { openFolderPicker() },
-            openRecent: { path in appendRoots([URL(fileURLWithPath: path)]) },
+            openRecent: { openRecentPath($0) },
             toggleSidebar: {
                 withAnimation(.easeInOut(duration: 0.16)) { isSidebarVisible.toggle() }
             },
@@ -262,9 +262,9 @@ struct ContentView: View {
     private var primaryPane: some View {
         if state.roots.isEmpty {
             WelcomeView(
-                recents: Array(recentStore.existingEntries().prefix(10)),
+                recents: Array(recentStore.visibleEntries.prefix(RecentFoldersStore.displayCap)),
                 onOpenFolder: { openFolderPicker() },
-                onOpenRecent: { path in appendRoots([URL(fileURLWithPath: path)]) },
+                onOpenRecent: { openRecentPath($0) },
                 onRemoveRecent: { path in recentStore.remove(path: path) }
             )
         } else if let tab = selectedTab {
@@ -409,6 +409,10 @@ struct ContentView: View {
         }
     }
 
+    private func openRecentPath(_ path: String) {
+        appendRoots([URL(fileURLWithPath: path)])
+    }
+
     private func handleDroppedFolders(_ providers: [NSItemProvider]) -> Bool {
         for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
@@ -445,6 +449,7 @@ struct ContentView: View {
     }
 
     private func appendRootsLocally(_ paths: [String]) {
+        // Offline path: roots are added locally but not recorded in recents (no core round-trip to confirm valid roots).
         let existing = Set(state.roots.map(\.path))
         let nextRoots = paths.filter { !existing.contains($0) }.map { path in
             WorkspaceRoot(

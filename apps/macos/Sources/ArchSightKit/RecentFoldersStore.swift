@@ -8,14 +8,17 @@ import Observation
 @Observable
 public final class RecentFoldersStore {
     public private(set) var entries: [RecentFolder]
+    public private(set) var visibleEntries: [RecentFolder] = []
 
     @ObservationIgnored private let defaults: UserDefaults
     private static let storageKey = "recentFolders.v1"
     private static let storedCap = 15
+    public static let displayCap = 10
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.entries = Self.load(from: defaults)
+        refreshVisible()
     }
 
     /// Inserts (or refreshes) `path` at the front, de-duplicating by path and
@@ -29,23 +32,28 @@ public final class RecentFoldersStore {
         let withoutDuplicate = entries.filter { $0.path != path }
         entries = Array(([entry] + withoutDuplicate).prefix(Self.storedCap))
         persist()
+        refreshVisible()
     }
 
     public func remove(path: String) {
         entries = entries.filter { $0.path != path }
         persist()
+        refreshVisible()
     }
 
     public func clear() {
         entries = []
         persist()
+        refreshVisible()
     }
 
-    /// Entries whose path is currently an existing directory. Used by the UI so
-    /// stale paths hide without being deleted (e.g. a temporarily unmounted volume).
-    public func existingEntries() -> [RecentFolder] {
+    /// Recomputes `visibleEntries` = entries whose path is currently an existing
+    /// directory. Cached (rather than filtered per-render) so SwiftUI never does
+    /// filesystem I/O inside a view `body`. Stale only across external filesystem
+    /// changes while no store mutation occurs — acceptable for this empty-state UI.
+    private func refreshVisible() {
         let fileManager = FileManager.default
-        return entries.filter { entry in
+        visibleEntries = entries.filter { entry in
             var isDirectory: ObjCBool = false
             let exists = fileManager.fileExists(atPath: entry.path, isDirectory: &isDirectory)
             return exists && isDirectory.boolValue

@@ -85,7 +85,7 @@ final class RecentFoldersStoreTests: XCTestCase {
         XCTAssertTrue(store.entries.isEmpty)
     }
 
-    func testExistingEntriesFiltersMissingPathsWithoutMutatingStorage() throws {
+    func testVisibleEntriesFilterMissingPathsWithoutMutatingStorage() throws {
         let tempDir = NSTemporaryDirectory() + "recent-\(UUID().uuidString)"
         try FileManager.default.createDirectory(
             atPath: tempDir, withIntermediateDirectories: true)
@@ -95,7 +95,26 @@ final class RecentFoldersStoreTests: XCTestCase {
         store.record(path: "/definitely/missing/path")
         store.record(path: tempDir)
 
-        XCTAssertEqual(store.existingEntries().map(\.path), [tempDir])
+        XCTAssertEqual(store.visibleEntries.map(\.path), [tempDir])
         XCTAssertEqual(store.entries.count, 2)
+    }
+
+    func testVisibleEntriesUpdateAfterRemove() throws {
+        let dirA = NSTemporaryDirectory() + "recentA-\(UUID().uuidString)"
+        let dirB = NSTemporaryDirectory() + "recentB-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dirA, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: dirB, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(atPath: dirA)
+            try? FileManager.default.removeItem(atPath: dirB)
+        }
+
+        let store = RecentFoldersStore(defaults: defaults)
+        store.record(path: dirA)
+        store.record(path: dirB)
+        XCTAssertEqual(Set(store.visibleEntries.map(\.path)), [dirA, dirB])
+
+        store.remove(path: dirA)
+        XCTAssertEqual(store.visibleEntries.map(\.path), [dirB])
     }
 }

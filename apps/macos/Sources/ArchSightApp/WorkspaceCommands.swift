@@ -44,7 +44,7 @@ struct WorkspaceMenuCommands: Commands {
                 .keyboardShortcut("o", modifiers: .command)
                 .disabled(actions == nil)
 
-            let recents = Array(recentStore.existingEntries().prefix(10))
+            let recents = Array(recentStore.visibleEntries.prefix(RecentFoldersStore.displayCap))
             Menu("Open Recent") {
                 ForEach(recents) { folder in
                     Button(folder.name) { actions?.openRecent(folder.path) }
