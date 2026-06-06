@@ -38,6 +38,10 @@ public final class CoreProcessSupervisor {
         let process = Process()
         process.executableURL = launchPlan.executable
         process.arguments = ["--socket", launchPlan.socketPath]
+        // GUI launches inherit the empty launchd PATH, which hides Homebrew/Go
+        // language servers from the core's exec.LookPath. Augment it so symbol
+        // navigation works from a packaged build, not just `swift run`.
+        process.environment = CoreLaunchEnvironment.resolvedEnvironment()
         try FileManager.default.createDirectory(
             at: URL(fileURLWithPath: launchPlan.socketPath).deletingLastPathComponent(),
             withIntermediateDirectories: true
