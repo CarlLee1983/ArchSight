@@ -24,6 +24,14 @@ struct CodeTextView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = CodeNSTextView()
+        // Force TextKit 1 with lazy, on-demand layout. macOS defaults NSTextView to
+        // TextKit 2, whose viewport layout re-typesets the *whole* document on every
+        // geometry change inside SwiftUI's NSHostingView (including a full-string bidi
+        // writing-direction scan). On a large, non-wrapped code file that pegs the CPU
+        // at 100% and balloons memory to ~1GB — the app appears hung on file open.
+        // Accessing `layoutManager` opts the view into TextKit 1; non-contiguous layout
+        // then lays out only the visible range, which also backs the line-number gutter.
+        textView.layoutManager?.allowsNonContiguousLayout = true
         textView.isEditable = false
         textView.isSelectable = true
         textView.isRichText = false  // disables RTF paste/string= attribute stripping; programmatic textStorage attributes still apply
