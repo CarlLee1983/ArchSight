@@ -33,7 +33,7 @@ struct HorizontalTabBar: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .help("Close Tab")
+                        .help(ShortcutCatalog.tooltip("Close Tab", "closeTab"))
                         .opacity(isSelected ? 0.8 : (hoveredTabID == tab.id ? 0.6 : 0.4))
                     }
                     .padding(.horizontal, 10)

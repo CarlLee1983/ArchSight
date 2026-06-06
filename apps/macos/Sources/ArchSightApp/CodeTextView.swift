@@ -13,6 +13,7 @@ struct CodeTextView: NSViewRepresentable {
     var scrollToLine: Int?
     var onDefinition: (Int, Int) -> Void
     var onReferences: (Int, Int) -> Void
+    var onCursorChange: (Int, Int) -> Void = { _, _ in }
 
     private var theme: ReadingTheme { ReadingTheme.theme(for: preferences.theme) }
     private var codeFont: NSFont { ReadingThemeAppKit.font(scale: preferences.fontScale) }
@@ -23,6 +24,14 @@ struct CodeTextView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = CodeNSTextView()
+        // Force TextKit 1 with lazy, on-demand layout. macOS defaults NSTextView to
+        // TextKit 2, whose viewport layout re-typesets the *whole* document on every
+        // geometry change inside SwiftUI's NSHostingView (including a full-string bidi
+        // writing-direction scan). On a large, non-wrapped code file that pegs the CPU
+        // at 100% and balloons memory to ~1GB — the app appears hung on file open.
+        // Accessing `layoutManager` opts the view into TextKit 1; non-contiguous layout
+        // then lays out only the visible range, which also backs the line-number gutter.
+        textView.layoutManager?.allowsNonContiguousLayout = true
         textView.isEditable = false
         textView.isSelectable = true
         textView.isRichText = false  // disables RTF paste/string= attribute stripping; programmatic textStorage attributes still apply
@@ -37,26 +46,47 @@ struct CodeTextView: NSViewRepresentable {
         let inset = preferences.lineSpacing.textInset
         textView.textContainerInset = NSSize(width: CGFloat(inset), height: CGFloat(inset))
         textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = true
-        textView.textContainer?.widthTracksTextView = false
-        textView.textContainer?.containerSize = NSSize(
-            width: CGFloat.greatestFiniteMagnitude,
-            height: CGFloat.greatestFiniteMagnitude
-        )
-        textView.maxSize = NSSize(
-            width: CGFloat.greatestFiniteMagnitude,
-            height: CGFloat.greatestFiniteMagnitude
-        )
         textView.usesFindBar = true
         textView.isIncrementalSearchingEnabled = true
         textView.coordinator = context.coordinator
+        textView.delegate = context.coordinator
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.borderType = .noBorder
         scrollView.documentView = textView
+
+        let ruler = LineNumberRulerView(textView: textView, scrollView: scrollView)
+        scrollView.verticalRulerView = ruler
+        scrollView.hasVerticalRuler = true
+        scrollView.rulersVisible = true
+
+        applyWordWrap(preferences.wordWrap, to: textView, scrollView: scrollView)
         return scrollView
+    }
+
+    /// Switches the code view between soft-wrap and horizontal-scroll layout.
+    /// Wrap on: the text container tracks the view width so lines re-flow. Wrap off
+    /// (default): an effectively infinite container width with a horizontal scroller,
+    /// which is also what keeps TextKit 1's lazy layout cheap on large files.
+    private func applyWordWrap(_ wrap: Bool, to textView: NSTextView, scrollView: NSScrollView) {
+        guard let container = textView.textContainer else { return }
+        if wrap {
+            let width = scrollView.contentSize.width
+            textView.isHorizontallyResizable = false
+            container.widthTracksTextView = true
+            container.containerSize = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+            textView.maxSize = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+            textView.setFrameSize(NSSize(width: width, height: textView.frame.height))
+            scrollView.hasHorizontalScroller = false
+        } else {
+            textView.isHorizontallyResizable = true
+            container.widthTracksTextView = false
+            container.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            scrollView.hasHorizontalScroller = true
+        }
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
@@ -65,9 +95,11 @@ struct CodeTextView: NSViewRepresentable {
         }
         context.coordinator.onDefinition = onDefinition
         context.coordinator.onReferences = onReferences
+        context.coordinator.onCursorChange = onCursorChange
 
-        let signature = "\(preferences.theme.rawValue)|\(preferences.fontScale)|\(preferences.lineSpacing.rawValue)"
+        let signature = "\(preferences.theme.rawValue)|\(preferences.fontScale)|\(preferences.lineSpacing.rawValue)|\(preferences.wordWrap)"
         if textView.string != content || context.coordinator.lastStyleSignature != signature {
+            applyWordWrap(preferences.wordWrap, to: textView, scrollView: scrollView)
             let paragraph = ReadingThemeAppKit.paragraphStyle(for: preferences.lineSpacing)
             let attributed = NSMutableAttributedString(
                 string: content,
@@ -91,6 +123,14 @@ struct CodeTextView: NSViewRepresentable {
             textView.textContainerInset = NSSize(width: CGFloat(inset), height: CGFloat(inset))
             textView.lastScrolledLine = nil
             context.coordinator.lastStyleSignature = signature
+
+            if let ruler = scrollView.verticalRulerView as? LineNumberRulerView {
+                ruler.gutterFont = .monospacedSystemFont(ofSize: codeFont.pointSize * 0.85, weight: .regular)
+                ruler.gutterBackgroundColor = ReadingThemeAppKit.backgroundColor(for: theme)
+                ruler.numberColor = ReadingThemeAppKit.foregroundColor(for: theme).withAlphaComponent(0.45)
+                ruler.currentNumberColor = ReadingThemeAppKit.foregroundColor(for: theme)
+                ruler.refresh(for: content)
+            }
         }
         if let line = scrollToLine, line != textView.lastScrolledLine {
             textView.scrollToLine(line)
@@ -98,10 +138,24 @@ struct CodeTextView: NSViewRepresentable {
         }
     }
 
-    final class Coordinator {
+    final class Coordinator: NSObject, NSTextViewDelegate {
         var onDefinition: (Int, Int) -> Void = { _, _ in }
         var onReferences: (Int, Int) -> Void = { _, _ in }
+        var onCursorChange: (Int, Int) -> Void = { _, _ in }
         var lastStyleSignature: String?
+
+        /// Reports the caret's 1-based line/column to the status bar. Fires for
+        /// both user clicks/arrow keys and programmatic `setSelectedRange` (used
+        /// by scroll-to-line navigation), so the indicator stays in sync.
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            let location = textView.selectedRange().location
+            let position = TextPosition.lineColumn(forUTF16Offset: location, in: textView.string)
+            onCursorChange(position.line, position.column)
+            if let ruler = textView.enclosingScrollView?.verticalRulerView as? LineNumberRulerView {
+                ruler.currentLine = position.line
+            }
+        }
     }
 }
 

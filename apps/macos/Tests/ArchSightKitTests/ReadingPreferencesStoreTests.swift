@@ -34,6 +34,18 @@ final class ReadingPreferencesStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.preferences.lineSpacing, .relaxed)
     }
 
+    func testToggleWordWrapFlipsAndPersists() {
+        let store = ReadingPreferencesStore(defaults: defaults)
+        XCTAssertFalse(store.preferences.wordWrap)
+        store.toggleWordWrap()
+        XCTAssertTrue(store.preferences.wordWrap)
+
+        let reloaded = ReadingPreferencesStore(defaults: defaults)
+        XCTAssertTrue(reloaded.preferences.wordWrap)
+        reloaded.toggleWordWrap()
+        XCTAssertFalse(reloaded.preferences.wordWrap)
+    }
+
     func testCorruptStorageFallsBackToDefaults() {
         defaults.set(Data("not json".utf8), forKey: "reading.preferences")
         let store = ReadingPreferencesStore(defaults: defaults)

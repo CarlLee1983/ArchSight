@@ -44,4 +44,14 @@ public enum TextPosition {
         }
         return index
     }
+
+    /// Number of newline-separated lines (newline count + 1). An empty string is
+    /// a single line. Used to clamp "Go to Line" input to the navigable range.
+    public static func lineCount(in text: String) -> Int {
+        var count = 1
+        for unit in text.utf16 where unit == 0x0A {
+            count += 1
+        }
+        return count
+    }
 }

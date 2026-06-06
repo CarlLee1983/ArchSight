@@ -159,6 +159,8 @@ func (s *Server) dispatch(req Request) Response {
 		return s.definition(req)
 	case "references":
 		return s.references(req)
+	case "documentSymbol":
+		return s.documentSymbol(req)
 	case "cancel":
 		return s.cancel(req)
 	default:
@@ -228,6 +230,16 @@ type navigationParams struct {
 
 type navigationResult struct {
 	Locations []lsp.Location `json:"locations"`
+}
+
+type documentSymbolParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	RootID      string `json:"rootId"`
+	Path        string `json:"path"`
+}
+
+type documentSymbolResult struct {
+	Symbols []lsp.Symbol `json:"symbols"`
 }
 
 type openFileResult struct {
@@ -479,6 +491,74 @@ func (s *Server) navigate(req Request, call func(context.Context, lsp.Request) (
 		return ErrorResponse(req.ID, err)
 	}
 	return SuccessResponse(req.ID, navigationResult{Locations: locations})
+}
+
+func (s *Server) documentSymbol(req Request) Response {
+	navReq, respErr := s.symbolRequest(req)
+	if respErr != nil {
+		return *respErr
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.trackActive(req.ID, cancel)
+	defer s.untrackActive(req.ID)
+
+	symbols, err := s.navigator.DocumentSymbol(ctx, navReq)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return ErrorResponse(req.ID, NewError("context_canceled", "Request canceled"))
+		}
+		var lspErr *lsp.Error
+		if lsp.AsError(err, &lspErr) {
+			return ErrorResponse(req.ID, NewError(lspErr.Code, lspErr.Message))
+		}
+		return ErrorResponse(req.ID, err)
+	}
+	return SuccessResponse(req.ID, documentSymbolResult{Symbols: symbols})
+}
+
+// symbolRequest validates a documentSymbol request. It mirrors navigationRequest
+// but needs no caret position, since the outline is whole-file.
+func (s *Server) symbolRequest(req Request) (lsp.Request, *Response) {
+	var params documentSymbolParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		resp := ErrorResponse(req.ID, NewError("invalid_params", err.Error()))
+		return lsp.Request{}, &resp
+	}
+	if params.WorkspaceID == "" || params.RootID == "" || params.Path == "" {
+		resp := ErrorResponse(req.ID, NewError("invalid_params", "workspaceId, rootId, and path are required"))
+		return lsp.Request{}, &resp
+	}
+
+	snapshot, ok := s.workspaces.Get(params.WorkspaceID)
+	if !ok {
+		resp := ErrorResponse(req.ID, NewError("not_found", "Workspace not found: "+params.WorkspaceID))
+		return lsp.Request{}, &resp
+	}
+	if snapshot.Status != workspace.StatusReady {
+		resp := ErrorResponse(req.ID, NewError("workspace_not_ready", "Workspace is not ready: "+params.WorkspaceID))
+		return lsp.Request{}, &resp
+	}
+	root, ok := findRoot(snapshot.Roots, params.RootID)
+	if !ok {
+		resp := ErrorResponse(req.ID, NewError("not_found", "Workspace root not found: "+params.RootID))
+		return lsp.Request{}, &resp
+	}
+	_, relPath, err := resolveWorkspaceFile(root.Path, params.Path)
+	if err != nil {
+		resp := ErrorResponse(req.ID, err)
+		return lsp.Request{}, &resp
+	}
+	if !snapshotHasFile(snapshot.Entries, root.ID, relPath) {
+		resp := ErrorResponse(req.ID, NewError("not_found", "File not found in workspace snapshot: "+relPath))
+		return lsp.Request{}, &resp
+	}
+
+	return lsp.Request{
+		Root:     root,
+		Language: syntax.DetectLanguage(relPath),
+		Path:     relPath,
+	}, nil
 }
 
 func (s *Server) navigationRequest(req Request) (lsp.Request, *Response) {

@@ -21,10 +21,10 @@ struct ReadingControlsView: View {
             HStack(spacing: 2) {
                 Button { store.decreaseFont() } label: { Image(systemName: "textformat.size.smaller") }
                     .disabled(store.preferences.fontScale <= ReadingPreferences.minFontScale)
-                    .help("Decrease text size")
+                    .help(ShortcutCatalog.tooltip("Decrease text size", "decreaseText"))
                 Button { store.increaseFont() } label: { Image(systemName: "textformat.size.larger") }
                     .disabled(store.preferences.fontScale >= ReadingPreferences.maxFontScale)
-                    .help("Increase text size")
+                    .help(ShortcutCatalog.tooltip("Increase text size", "increaseText"))
             }
 
             Picker("Line spacing", selection: lineSpacingBinding) {

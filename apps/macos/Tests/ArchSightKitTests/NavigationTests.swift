@@ -144,4 +144,8 @@ private final class StubServicing: CoreServicing {
         referencesCalls.append((rootId, path, line, column))
         return navigationResult
     }
+
+    func documentSymbol(workspaceId: String, rootId: String, path: String) throws -> DocumentSymbolResult {
+        DocumentSymbolResult(symbols: [])
+    }
 }

@@ -18,6 +18,7 @@ struct ContentView: View {
     enum SidebarTab: String, CaseIterable, Sendable {
         case explorer
         case search
+        case outline
     }
     @State var activeSidebarTab: SidebarTab = .explorer
     @State private var comparisonTabID: FileTab.ID?
@@ -27,9 +28,19 @@ struct ContentView: View {
     @State var hoveredOpenTabID: FileTab.ID?
     @State var searchSelection: SearchMatch.ID?
     @State var pendingScrollLine: Int?
+    @State private var cursorLine = 1
+    @State private var cursorColumn = 1
     @State private var markdownDisplayMode: MarkdownDisplayMode = .preview
     @State private var isQuickOpenPresented = false
     @State private var isShortcutsPresented = false
+    @State private var isGoToLinePresented = false
+    @State private var isGoToSymbolPresented = false
+    @State private var documentSymbols: [DocumentSymbol] = []
+    @State private var isLoadingSymbols = false
+    // Docked Outline panel (activity-bar tab). Separate from the ⇧⌘O overlay state so
+    // the two never interfere. Populated lazily — only while the Outline tab is active.
+    @State var outlineSymbols: [DocumentSymbol] = []
+    @State var isLoadingOutline = false
     @Environment(ReadingPreferencesStore.self) private var readingStore
     @Environment(RecentFoldersStore.self) private var recentStore
     @Environment(AppCore.self) private var appCore
@@ -86,6 +97,43 @@ struct ContentView: View {
                 }
             }
         }
+        .overlay {
+            if isGoToLinePresented, let tab = selectedTab {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.12)
+                        .ignoresSafeArea()
+                        .onTapGesture { isGoToLinePresented = false }
+                    GoToLinePanel(
+                        totalLines: TextPosition.lineCount(in: tab.content),
+                        onGo: { line in
+                            isGoToLinePresented = false
+                            pendingScrollLine = line
+                        },
+                        onClose: { isGoToLinePresented = false }
+                    )
+                    .padding(.top, 40)
+                }
+            }
+        }
+        .overlay {
+            if isGoToSymbolPresented {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.12)
+                        .ignoresSafeArea()
+                        .onTapGesture { isGoToSymbolPresented = false }
+                    GoToSymbolPanel(
+                        symbols: documentSymbols,
+                        isLoading: isLoadingSymbols,
+                        onGo: { symbol in
+                            isGoToSymbolPresented = false
+                            pendingScrollLine = symbol.line
+                        },
+                        onClose: { isGoToSymbolPresented = false }
+                    )
+                    .padding(.top, 40)
+                }
+            }
+        }
         .focusedValue(\.workspaceCommands, WorkspaceCommandActions(
             openFolder: { openFolderPicker() },
             openRecent: { openRecentPath($0) },
@@ -104,18 +152,24 @@ struct ContentView: View {
             collapseAll: { collapseAll() },
             selectTab: { number in selectTab(at: number) },
             quickOpen: {
-                isShortcutsPresented = false
+                dismissOverlays()
                 isQuickOpenPresented = true
             },
+            goToLine: { presentGoToLine() },
+            goToSymbol: { presentGoToSymbol() },
             goBack: { goBack() },
             goForward: { goForward() },
             nextTab: { selectAndRecord { state.selectNextTab() } },
             previousTab: { selectAndRecord { state.selectPreviousTab() } },
             showShortcuts: {
-                isQuickOpenPresented = false
+                dismissOverlays()
                 isShortcutsPresented = true
             }
         ))
+        // Refresh the outline when the active file changes while the panel is open.
+        // Switching *to* the Outline tab (and re-showing the sidebar) is covered by
+        // OutlinePanel's onAppear, so we don't also observe activeSidebarTab here.
+        .onChange(of: state.selectedTabID) { _, _ in loadOutlineIfNeeded() }
     }
 
     // MARK: - Toolbar
@@ -125,20 +179,20 @@ struct ContentView: View {
         ToolbarItemGroup(placement: .navigation) {
             Button { goBack() } label: { Image(systemName: "chevron.left") }
                 .disabled(!history.canGoBack)
-                .help("Back \(ShortcutCatalog.hint("back")?.chord.display ?? "")")
+                .help(ShortcutCatalog.tooltip("Back", "back"))
             Button { goForward() } label: { Image(systemName: "chevron.right") }
                 .disabled(!history.canGoForward)
-                .help("Forward \(ShortcutCatalog.hint("forward")?.chord.display ?? "")")
+                .help(ShortcutCatalog.tooltip("Forward", "forward"))
         }
         ToolbarItemGroup {
             Button { openFolderPicker() } label: {
                 Label("Open Folder", systemImage: "folder.badge.plus")
             }
-            .help("Open Folder \(ShortcutCatalog.hint("openFolder")?.chord.display ?? "")")
+            .help(ShortcutCatalog.tooltip("Open Folder", "openFolder"))
             Toggle(isOn: $isSplit) {
                 Label("Split", systemImage: "rectangle.split.2x1")
             }
-            .help("Split Editor \(ShortcutCatalog.hint("splitEditor")?.chord.display ?? "") · compare two files")
+            .help("\(ShortcutCatalog.tooltip("Split Editor", "splitEditor")) · compare two files")
             if state.isLoading {
                 ProgressView().controlSize(.small)
             }
@@ -206,12 +260,27 @@ struct ContentView: View {
                 }
                 
                 Spacer()
-                
+
                 if let tab = selectedTab {
                     Text(tab.path)
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
+                        .layoutPriority(-1)
+
+                    Button {
+                        presentGoToLine()
+                    } label: {
+                        Text("Ln \(cursorLine), Col \(cursorColumn)")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(ShortcutCatalog.tooltip("Go to Line", "goToLine"))
+
+                    Text(LanguageLabel.forPath(tab.path))
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
                 }
             }
             .padding(.horizontal, 12)
@@ -256,6 +325,10 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.textBackgroundColor))
         .safeAreaInset(edge: .bottom) { referencesPanel }
+        .onChange(of: state.selectedTabID) { _, _ in
+            cursorLine = 1
+            cursorColumn = 1
+        }
     }
 
     @ViewBuilder
@@ -268,7 +341,7 @@ struct ContentView: View {
                 onRemoveRecent: { path in recentStore.remove(path: path) }
             )
         } else if let tab = selectedTab {
-            filePane(for: tab, scrollLine: pendingScrollLine)
+            filePane(for: tab, scrollLine: pendingScrollLine, reportsCursor: true)
         } else {
             ContentUnavailableView("Read Only", systemImage: "eye")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -298,7 +371,15 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func filePane(for tab: FileTab, scrollLine: Int?) -> some View {
+    private func filePane(for tab: FileTab, scrollLine: Int?, reportsCursor: Bool = false) -> some View {
+        VStack(spacing: 0) {
+            BreadcrumbBar(path: tab.path)
+            fileContent(for: tab, scrollLine: scrollLine, reportsCursor: reportsCursor)
+        }
+    }
+
+    @ViewBuilder
+    private func fileContent(for tab: FileTab, scrollLine: Int?, reportsCursor: Bool) -> some View {
         if tab.canPreviewMarkdown {
             VStack(spacing: 0) {
                 HStack {
@@ -322,7 +403,7 @@ struct ContentView: View {
                 case .preview:
                     MarkdownPreviewView(content: tab.content, preferences: readingStore.preferences)
                 case .source:
-                    codeView(for: tab, scrollLine: scrollLine)
+                    codeView(for: tab, scrollLine: scrollLine, reportsCursor: reportsCursor)
                 }
             }
         } else {
@@ -333,19 +414,24 @@ struct ContentView: View {
                 }
                 .padding(6)
                 Divider()
-                codeView(for: tab, scrollLine: scrollLine)
+                codeView(for: tab, scrollLine: scrollLine, reportsCursor: reportsCursor)
             }
         }
     }
 
-    private func codeView(for tab: FileTab, scrollLine: Int?) -> some View {
+    private func codeView(for tab: FileTab, scrollLine: Int?, reportsCursor: Bool = false) -> some View {
         CodeTextView(
             content: tab.content,
             tokens: tab.tokens,
             preferences: readingStore.preferences,
             scrollToLine: scrollLine,
             onDefinition: { line, column in requestDefinition(on: tab, line: line, column: column) },
-            onReferences: { line, column in requestReferences(on: tab, line: line, column: column) }
+            onReferences: { line, column in requestReferences(on: tab, line: line, column: column) },
+            onCursorChange: { line, column in
+                guard reportsCursor else { return }
+                cursorLine = line
+                cursorColumn = column
+            }
         )
     }
 
@@ -387,7 +473,7 @@ struct ContentView: View {
 
     // MARK: - Derived
 
-    private var selectedTab: FileTab? {
+    var selectedTab: FileTab? {
         state.openTabs.first { $0.id == state.selectedTabID }
     }
 
@@ -547,6 +633,104 @@ struct ContentView: View {
         // and the root sections together.
         expandedPaths = []
         collapsedRoots = Set(state.roots.map(\.id))
+    }
+
+    /// Presents the Go to Line overlay (no-op without an open file), ensuring the
+    /// other overlays are dismissed first so only one is visible at a time.
+    private func presentGoToLine() {
+        guard selectedTab != nil else { return }
+        dismissOverlays()
+        isGoToLinePresented = true
+    }
+
+    /// Presents the Go to Symbol overlay and kicks off a lazy documentSymbol fetch
+    /// for the open file. No-op without an open file.
+    private func presentGoToSymbol() {
+        guard let tab = selectedTab else { return }
+        dismissOverlays()
+        documentSymbols = []
+        isLoadingSymbols = true
+        isGoToSymbolPresented = true
+        fetchDocumentSymbols(for: tab)
+    }
+
+    private func dismissOverlays() {
+        isQuickOpenPresented = false
+        isShortcutsPresented = false
+        isGoToLinePresented = false
+        isGoToSymbolPresented = false
+    }
+
+    private func fetchDocumentSymbols(for tab: FileTab) {
+        guard let endpoint = coreEndpoint, let workspaceId = state.workspaceId else {
+            isLoadingSymbols = false
+            return
+        }
+        Task {
+            defer { isLoadingSymbols = false }
+            do {
+                let symbols = try await Task.detached {
+                    try endpoint.makeController().documentSymbols(
+                        workspaceId: workspaceId,
+                        rootId: tab.rootID,
+                        path: tab.path
+                    )
+                }.value
+                // Drop results if the user already dismissed or switched files.
+                guard isGoToSymbolPresented, selectedTab?.id == tab.id else { return }
+                documentSymbols = symbols
+            } catch {
+                guard isGoToSymbolPresented, selectedTab?.id == tab.id else { return }
+                state.errorMessage = Self.describe(error)
+                isGoToSymbolPresented = false
+            }
+        }
+    }
+
+    /// Lazily (re)loads the Outline panel's symbols. Only fetches while the Outline
+    /// tab is the active sidebar tab — matching the lazy-LSP policy: no symbol traffic
+    /// when the panel isn't on screen. Clears when there is no open file.
+    func loadOutlineIfNeeded() {
+        guard activeSidebarTab == .outline else { return }
+        guard let tab = selectedTab else {
+            outlineSymbols = []
+            isLoadingOutline = false
+            return
+        }
+        fetchOutlineSymbols(for: tab)
+    }
+
+    private func fetchOutlineSymbols(for tab: FileTab) {
+        guard let endpoint = coreEndpoint, let workspaceId = state.workspaceId else {
+            outlineSymbols = []
+            isLoadingOutline = false
+            return
+        }
+        outlineSymbols = []
+        isLoadingOutline = true
+        Task {
+            defer { isLoadingOutline = false }
+            do {
+                let symbols = try await Task.detached {
+                    try endpoint.makeController().documentSymbols(
+                        workspaceId: workspaceId,
+                        rootId: tab.rootID,
+                        path: tab.path
+                    )
+                }.value
+                // Drop stale results if the user switched files or left the Outline tab.
+                guard activeSidebarTab == .outline, selectedTab?.id == tab.id else { return }
+                outlineSymbols = symbols
+            } catch {
+                guard activeSidebarTab == .outline, selectedTab?.id == tab.id else { return }
+                outlineSymbols = []
+            }
+        }
+    }
+
+    /// Navigates the active editor to a symbol picked from the Outline panel.
+    func goToOutlineSymbol(_ symbol: DocumentSymbol) {
+        pendingScrollLine = symbol.line
     }
 
     func openEntry(_ entry: WorkspaceEntry) {

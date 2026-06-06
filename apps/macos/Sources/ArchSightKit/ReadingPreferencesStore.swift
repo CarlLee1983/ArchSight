@@ -28,6 +28,10 @@ public final class ReadingPreferencesStore {
         update { $0.tabLayoutMode = mode }
     }
 
+    public func toggleWordWrap() {
+        update { $0.wordWrap.toggle() }
+    }
+
     public func increaseFont() {
         preferences = preferences.increasedFont()
         persist()

@@ -199,6 +199,59 @@ func TestManagerReferencesReturnsLocations(t *testing.T) {
 	}
 }
 
+func TestManagerDocumentSymbolFlattensHierarchyWithDepth(t *testing.T) {
+	rootPath := t.TempDir()
+	manager := NewManager(Options{
+		Registry: map[string]ServerConfig{
+			"go": fakeLSPServerConfig(t, rootPath),
+		},
+	})
+	t.Cleanup(manager.Shutdown)
+
+	symbols, err := manager.DocumentSymbol(context.Background(), Request{
+		Root:     workspace.Root{ID: "root_1", Path: rootPath},
+		Language: "go",
+		Path:     "main.go",
+	})
+	if err != nil {
+		t.Fatalf("DocumentSymbol returned error: %v", err)
+	}
+	if len(symbols) != 2 {
+		t.Fatalf("expected two flattened symbols, got %+v", symbols)
+	}
+	if symbols[0].Name != "Greeter" || symbols[0].Kind != 5 || symbols[0].Depth != 0 {
+		t.Fatalf("unexpected top-level symbol: %+v", symbols[0])
+	}
+	// selectionRange start is 0-based line 4, char 5 -> 1-based 5:6.
+	if symbols[0].Line != 5 || symbols[0].Column != 6 {
+		t.Fatalf("expected selectionRange-based 1-based position, got %+v", symbols[0])
+	}
+	if symbols[1].Name != "hello" || symbols[1].Kind != 6 || symbols[1].Depth != 1 {
+		t.Fatalf("unexpected nested symbol: %+v", symbols[1])
+	}
+	if symbols[1].Line != 6 || symbols[1].Column != 7 {
+		t.Fatalf("expected nested 1-based position, got %+v", symbols[1])
+	}
+}
+
+func TestParseSymbolsHandlesFlatInformationAndNull(t *testing.T) {
+	if got := parseSymbols([]byte("null")); len(got) != 0 {
+		t.Fatalf("expected empty slice for null, got %+v", got)
+	}
+	if got := parseSymbols(nil); len(got) != 0 {
+		t.Fatalf("expected empty slice for empty input, got %+v", got)
+	}
+
+	flat := []byte(`[{"name":"main","kind":12,"location":{"uri":"file:///x/main.go","range":{"start":{"line":2,"character":5},"end":{"line":2,"character":9}}}}]`)
+	symbols := parseSymbols(flat)
+	if len(symbols) != 1 {
+		t.Fatalf("expected one flat symbol, got %+v", symbols)
+	}
+	if symbols[0].Name != "main" || symbols[0].Kind != 12 || symbols[0].Line != 3 || symbols[0].Column != 6 || symbols[0].Depth != 0 {
+		t.Fatalf("unexpected flat symbol: %+v", symbols[0])
+	}
+}
+
 func fakeLSPServerConfig(t *testing.T, rootPath string) ServerConfig {
 	t.Helper()
 
@@ -303,6 +356,39 @@ func TestFakeLSPServer(t *testing.T) {
 						"range": map[string]any{
 							"start": map[string]any{"line": 2, "character": 3},
 							"end":   map[string]any{"line": 2, "character": 9},
+						},
+					},
+				},
+			})
+		case "textDocument/documentSymbol":
+			writeLSPMessage(map[string]any{
+				"jsonrpc": "2.0",
+				"id":      req.ID,
+				"result": []map[string]any{
+					{
+						"name": "Greeter",
+						"kind": 5, // Class
+						"range": map[string]any{
+							"start": map[string]any{"line": 4, "character": 0},
+							"end":   map[string]any{"line": 9, "character": 1},
+						},
+						"selectionRange": map[string]any{
+							"start": map[string]any{"line": 4, "character": 5},
+							"end":   map[string]any{"line": 4, "character": 12},
+						},
+						"children": []map[string]any{
+							{
+								"name": "hello",
+								"kind": 6, // Method
+								"range": map[string]any{
+									"start": map[string]any{"line": 5, "character": 2},
+									"end":   map[string]any{"line": 7, "character": 3},
+								},
+								"selectionRange": map[string]any{
+									"start": map[string]any{"line": 5, "character": 6},
+									"end":   map[string]any{"line": 5, "character": 11},
+								},
+							},
 						},
 					},
 				},

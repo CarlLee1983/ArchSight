@@ -75,6 +75,8 @@ public enum ShortcutCatalog {
         ShortcutHint(id: "newWindow", category: .navigation, label: "New Window", chord: KeyChord(key: "N", command: true)),
         ShortcutHint(id: "openFolder", category: .navigation, label: "Open Folder", chord: KeyChord(key: "O", command: true)),
         ShortcutHint(id: "quickOpen", category: .navigation, label: "Quick Open", chord: KeyChord(key: "P", command: true)),
+        ShortcutHint(id: "goToLine", category: .navigation, label: "Go to Line", chord: KeyChord(key: "G", control: true)),
+        ShortcutHint(id: "goToSymbol", category: .navigation, label: "Go to Symbol in File", chord: KeyChord(key: "O", command: true, shift: true)),
         ShortcutHint(id: "findInFile", category: .navigation, label: "Find in File", chord: KeyChord(key: "F", command: true)), // AppKit native find bar (usesFindBar), not an explicit app binding
         ShortcutHint(id: "back", category: .navigation, label: "Back", chord: KeyChord(key: "[", command: true)),
         ShortcutHint(id: "forward", category: .navigation, label: "Forward", chord: KeyChord(key: "]", command: true)),
@@ -84,6 +86,7 @@ public enum ShortcutCatalog {
         ShortcutHint(id: "showSearch", category: .view, label: "Show Search", chord: KeyChord(key: "F", command: true, shift: true)),
         ShortcutHint(id: "splitEditor", category: .view, label: "Split Editor", chord: KeyChord(key: "\\", command: true)),
         ShortcutHint(id: "collapseFolders", category: .view, label: "Collapse Folders", chord: KeyChord(key: "0", command: true, option: true)),
+        ShortcutHint(id: "wordWrap", category: .view, label: "Toggle Word Wrap", chord: KeyChord(key: "Z", option: true)),
         ShortcutHint(id: "increaseText", category: .view, label: "Increase Text Size", chord: KeyChord(key: "=", command: true)),
         ShortcutHint(id: "decreaseText", category: .view, label: "Decrease Text Size", chord: KeyChord(key: "-", command: true)),
         // Tabs
@@ -97,6 +100,14 @@ public enum ShortcutCatalog {
 
     public static func hint(_ id: String) -> ShortcutHint? {
         all.first { $0.id == id }
+    }
+
+    /// VSCode-style tooltip text: `"Label (⇧⌘E)"` when a hint is registered for
+    /// `id`, otherwise the bare `label` (no trailing space, no empty parens).
+    /// Centralizes the one format so every `.help(…)` tooltip stays consistent.
+    public static func tooltip(_ label: String, _ id: String) -> String {
+        guard let chord = hint(id)?.chord.display else { return label }
+        return "\(label) (\(chord))"
     }
 
     public static func grouped() -> [(ShortcutCategory, [ShortcutHint])] {

@@ -51,6 +51,7 @@ Errors are structured:
 - `syntax`: returns syntax tokens for an opened file.
 - `definition`: performs lazy LSP definition lookup.
 - `references`: performs lazy LSP references lookup.
+- `documentSymbol`: performs lazy LSP file-outline (Go to Symbol) lookup.
 - `cancel`: cancels a request by ID.
 
 No edit, format, code action, completion, or diagnostics methods are part of the protocol.
@@ -221,7 +222,38 @@ Responses use the same stable location shape for definition and references:
 }
 ```
 
-Navigation requests are the only IPC methods allowed to activate language servers. `completion`, `codeAction`, `diagnostics`, and `formatting` are intentionally unsupported methods.
+## Document Symbols
+
+`documentSymbol` returns a file's outline for Go to Symbol. Like definition/references it requires a ready workspace snapshot, preserved root identity, and a relative file path inside the snapshot, but it needs no position because the request is whole-file.
+
+```json
+{
+  "id": "req_symbols",
+  "method": "documentSymbol",
+  "params": {
+    "workspaceId": "ws_1",
+    "rootId": "root_1",
+    "path": "cmd/main.go"
+  }
+}
+```
+
+The core flattens both LSP shapes (hierarchical `DocumentSymbol[]` and flat `SymbolInformation[]`) into a single list. `kind` is the LSP `SymbolKind` integer; `line`/`column` are 1-based; `depth` is 0 for top-level symbols and increases with nesting.
+
+```json
+{
+  "id": "req_symbols",
+  "ok": true,
+  "result": {
+    "symbols": [
+      { "name": "Greeter", "kind": 5, "line": 5, "column": 6, "depth": 0 },
+      { "name": "hello", "kind": 6, "line": 6, "column": 7, "depth": 1 }
+    ]
+  }
+}
+```
+
+Navigation requests (`definition`, `references`, `documentSymbol`) are the only IPC methods allowed to activate language servers. `completion`, `codeAction`, `diagnostics`, and `formatting` are intentionally unsupported methods.
 
 ## Streaming
 
