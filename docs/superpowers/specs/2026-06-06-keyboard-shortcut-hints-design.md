@@ -1,6 +1,6 @@
 # 快捷鍵提示（Cheat Sheet + Tooltip）Design
 
-**狀態：** 已通過 brainstorming，待寫實作計畫。
+**狀態：** 已實作並合併（`ShortcutCatalog` / `ShortcutCheatSheet` / 工具列 tooltip 皆已落地，見 `apps/macos/README.md` 的 Keyboard Shortcuts 一節）。
 **日期：** 2026-06-06
 **前置依賴：** Plan B（快捷鍵）已完成並合併（`WorkspaceCommands.swift`、`@FocusedValue` 路由、各 `keyboardShortcut` 綁定皆已存在）。
 
