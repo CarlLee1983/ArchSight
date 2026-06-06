@@ -27,6 +27,8 @@ struct ContentView: View {
     @State var hoveredOpenTabID: FileTab.ID?
     @State var searchSelection: SearchMatch.ID?
     @State var pendingScrollLine: Int?
+    @State private var cursorLine = 1
+    @State private var cursorColumn = 1
     @State private var markdownDisplayMode: MarkdownDisplayMode = .preview
     @State private var isQuickOpenPresented = false
     @State private var isShortcutsPresented = false
@@ -127,12 +129,7 @@ struct ContentView: View {
                 isGoToLinePresented = false
                 isQuickOpenPresented = true
             },
-            goToLine: {
-                guard selectedTab != nil else { return }
-                isQuickOpenPresented = false
-                isShortcutsPresented = false
-                isGoToLinePresented = true
-            },
+            goToLine: { presentGoToLine() },
             goBack: { goBack() },
             goForward: { goForward() },
             nextTab: { selectAndRecord { state.selectNextTab() } },
@@ -233,12 +230,27 @@ struct ContentView: View {
                 }
                 
                 Spacer()
-                
+
                 if let tab = selectedTab {
                     Text(tab.path)
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
+                        .layoutPriority(-1)
+
+                    Button {
+                        presentGoToLine()
+                    } label: {
+                        Text("Ln \(cursorLine), Col \(cursorColumn)")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Go to Line \(ShortcutCatalog.hint("goToLine")?.chord.display ?? "")")
+
+                    Text(LanguageLabel.forPath(tab.path))
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
                 }
             }
             .padding(.horizontal, 12)
@@ -283,6 +295,10 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.textBackgroundColor))
         .safeAreaInset(edge: .bottom) { referencesPanel }
+        .onChange(of: state.selectedTabID) { _, _ in
+            cursorLine = 1
+            cursorColumn = 1
+        }
     }
 
     @ViewBuilder
@@ -295,7 +311,7 @@ struct ContentView: View {
                 onRemoveRecent: { path in recentStore.remove(path: path) }
             )
         } else if let tab = selectedTab {
-            filePane(for: tab, scrollLine: pendingScrollLine)
+            filePane(for: tab, scrollLine: pendingScrollLine, reportsCursor: true)
         } else {
             ContentUnavailableView("Read Only", systemImage: "eye")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -325,7 +341,7 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func filePane(for tab: FileTab, scrollLine: Int?) -> some View {
+    private func filePane(for tab: FileTab, scrollLine: Int?, reportsCursor: Bool = false) -> some View {
         if tab.canPreviewMarkdown {
             VStack(spacing: 0) {
                 HStack {
@@ -349,7 +365,7 @@ struct ContentView: View {
                 case .preview:
                     MarkdownPreviewView(content: tab.content, preferences: readingStore.preferences)
                 case .source:
-                    codeView(for: tab, scrollLine: scrollLine)
+                    codeView(for: tab, scrollLine: scrollLine, reportsCursor: reportsCursor)
                 }
             }
         } else {
@@ -360,19 +376,24 @@ struct ContentView: View {
                 }
                 .padding(6)
                 Divider()
-                codeView(for: tab, scrollLine: scrollLine)
+                codeView(for: tab, scrollLine: scrollLine, reportsCursor: reportsCursor)
             }
         }
     }
 
-    private func codeView(for tab: FileTab, scrollLine: Int?) -> some View {
+    private func codeView(for tab: FileTab, scrollLine: Int?, reportsCursor: Bool = false) -> some View {
         CodeTextView(
             content: tab.content,
             tokens: tab.tokens,
             preferences: readingStore.preferences,
             scrollToLine: scrollLine,
             onDefinition: { line, column in requestDefinition(on: tab, line: line, column: column) },
-            onReferences: { line, column in requestReferences(on: tab, line: line, column: column) }
+            onReferences: { line, column in requestReferences(on: tab, line: line, column: column) },
+            onCursorChange: { line, column in
+                guard reportsCursor else { return }
+                cursorLine = line
+                cursorColumn = column
+            }
         )
     }
 
@@ -574,6 +595,15 @@ struct ContentView: View {
         // and the root sections together.
         expandedPaths = []
         collapsedRoots = Set(state.roots.map(\.id))
+    }
+
+    /// Presents the Go to Line overlay (no-op without an open file), ensuring the
+    /// other overlays are dismissed first so only one is visible at a time.
+    private func presentGoToLine() {
+        guard selectedTab != nil else { return }
+        isQuickOpenPresented = false
+        isShortcutsPresented = false
+        isGoToLinePresented = true
     }
 
     func openEntry(_ entry: WorkspaceEntry) {

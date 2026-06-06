@@ -13,6 +13,7 @@ struct CodeTextView: NSViewRepresentable {
     var scrollToLine: Int?
     var onDefinition: (Int, Int) -> Void
     var onReferences: (Int, Int) -> Void
+    var onCursorChange: (Int, Int) -> Void = { _, _ in }
 
     private var theme: ReadingTheme { ReadingTheme.theme(for: preferences.theme) }
     private var codeFont: NSFont { ReadingThemeAppKit.font(scale: preferences.fontScale) }
@@ -50,6 +51,7 @@ struct CodeTextView: NSViewRepresentable {
         textView.usesFindBar = true
         textView.isIncrementalSearchingEnabled = true
         textView.coordinator = context.coordinator
+        textView.delegate = context.coordinator
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -65,6 +67,7 @@ struct CodeTextView: NSViewRepresentable {
         }
         context.coordinator.onDefinition = onDefinition
         context.coordinator.onReferences = onReferences
+        context.coordinator.onCursorChange = onCursorChange
 
         let signature = "\(preferences.theme.rawValue)|\(preferences.fontScale)|\(preferences.lineSpacing.rawValue)"
         if textView.string != content || context.coordinator.lastStyleSignature != signature {
@@ -98,10 +101,21 @@ struct CodeTextView: NSViewRepresentable {
         }
     }
 
-    final class Coordinator {
+    final class Coordinator: NSObject, NSTextViewDelegate {
         var onDefinition: (Int, Int) -> Void = { _, _ in }
         var onReferences: (Int, Int) -> Void = { _, _ in }
+        var onCursorChange: (Int, Int) -> Void = { _, _ in }
         var lastStyleSignature: String?
+
+        /// Reports the caret's 1-based line/column to the status bar. Fires for
+        /// both user clicks/arrow keys and programmatic `setSelectedRange` (used
+        /// by scroll-to-line navigation), so the indicator stays in sync.
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            let location = textView.selectedRange().location
+            let position = TextPosition.lineColumn(forUTF16Offset: location, in: textView.string)
+            onCursorChange(position.line, position.column)
+        }
     }
 }
 
