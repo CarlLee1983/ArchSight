@@ -9,6 +9,22 @@ memory, startup, and indexing cost of an Electron IDE.
 It is an observation cockpit, not an editor: no editing, autocomplete, code
 actions, write-time diagnostics, or background linting.
 
+## Install
+
+```sh
+brew install --cask CarlLee1983/tap/archsight
+xattr -dr com.apple.quarantine /Applications/ArchSight.app
+```
+
+ArchSight ships as a Homebrew cask from a personal tap. The app is ad-hoc
+signed but not yet notarized, so the second command clears Gatekeeper's
+quarantine flag once (Homebrew removed its `--no-quarantine` option). You can
+instead open it the first time via right-click > Open, or via
+System Settings > Privacy & Security > "Open Anyway".
+
+Requires macOS 14 (Sonoma) or later. To build and run from source instead, see
+[Quickstart](#quickstart) below.
+
 ## Architecture
 
 - **macOS shell** (`apps/macos`) — SwiftUI/AppKit, native rendering, read-only
