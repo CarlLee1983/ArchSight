@@ -10,6 +10,7 @@ public enum IPCMethod: String, Codable, Sendable {
     case search
     case definition
     case references
+    case documentSymbol
     case cancel
 }
 
@@ -106,6 +107,18 @@ public struct NavigationParams: Encodable, Equatable, Sendable {
         self.path = path
         self.line = line
         self.column = column
+    }
+}
+
+public struct DocumentSymbolParams: Encodable, Equatable, Sendable {
+    public let workspaceId: String
+    public let rootId: String
+    public let path: String
+
+    public init(workspaceId: String, rootId: String, path: String) {
+        self.workspaceId = workspaceId
+        self.rootId = rootId
+        self.path = path
     }
 }
 
@@ -258,5 +271,34 @@ public struct NavigationResult: Decodable, Equatable, Sendable {
 
     public init(locations: [Location]) {
         self.locations = locations
+    }
+}
+
+/// One entry of a file's outline, as returned by the core's documentSymbol.
+/// `depth` is 0 for top-level symbols and increases with nesting.
+public struct DocumentSymbol: Decodable, Equatable, Identifiable, Sendable {
+    public var id: String { "\(line):\(column):\(name)" }
+    public let name: String
+    public let kind: Int
+    public let detail: String?
+    public let line: Int
+    public let column: Int
+    public let depth: Int
+
+    public init(name: String, kind: Int, detail: String? = nil, line: Int, column: Int, depth: Int = 0) {
+        self.name = name
+        self.kind = kind
+        self.detail = detail
+        self.line = line
+        self.column = column
+        self.depth = depth
+    }
+}
+
+public struct DocumentSymbolResult: Decodable, Equatable, Sendable {
+    public let symbols: [DocumentSymbol]
+
+    public init(symbols: [DocumentSymbol]) {
+        self.symbols = symbols
     }
 }

@@ -77,4 +77,9 @@ public final class WorkspaceController {
     public func references(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> [Location] {
         try client.references(workspaceId: workspaceId, rootId: rootId, path: path, line: line, column: column).locations
     }
+
+    /// Resolves the file's outline (document symbols) for Go to Symbol.
+    public func documentSymbols(workspaceId: String, rootId: String, path: String) throws -> [DocumentSymbol] {
+        try client.documentSymbol(workspaceId: workspaceId, rootId: rootId, path: path).symbols
+    }
 }

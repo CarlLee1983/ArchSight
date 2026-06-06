@@ -206,4 +206,8 @@ private final class FakeCoreClient: CoreServicing {
     func references(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> NavigationResult {
         NavigationResult(locations: [])
     }
+
+    func documentSymbol(workspaceId: String, rootId: String, path: String) throws -> DocumentSymbolResult {
+        DocumentSymbolResult(symbols: [])
+    }
 }

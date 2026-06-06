@@ -24,6 +24,7 @@ public protocol CoreServicing: AnyObject {
     func search(workspaceId: String, pattern: String) throws -> SearchResult
     func definition(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> NavigationResult
     func references(workspaceId: String, rootId: String, path: String, line: Int, column: Int) throws -> NavigationResult
+    func documentSymbol(workspaceId: String, rootId: String, path: String) throws -> DocumentSymbolResult
 }
 
 public final class CoreClient: CoreHealthChecking, CoreServicing {
@@ -103,6 +104,14 @@ public final class CoreClient: CoreHealthChecking, CoreServicing {
             .references,
             params: NavigationParams(workspaceId: workspaceId, rootId: rootId, path: path, line: line, column: column),
             resultType: NavigationResult.self
+        )
+    }
+
+    public func documentSymbol(workspaceId: String, rootId: String, path: String) throws -> DocumentSymbolResult {
+        try send(
+            .documentSymbol,
+            params: DocumentSymbolParams(workspaceId: workspaceId, rootId: rootId, path: path),
+            resultType: DocumentSymbolResult.self
         )
     }
 
