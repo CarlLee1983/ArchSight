@@ -5,6 +5,7 @@ import SwiftUI
 /// Defaults are no-ops so the menu items stay harmless when no window is focused.
 struct WorkspaceCommandActions {
     var openFolder: () -> Void = {}
+    var openRecent: (String) -> Void = { _ in }
     var toggleSidebar: () -> Void = {}
     var focusExplorer: () -> Void = {}
     var focusSearch: () -> Void = {}
@@ -34,6 +35,7 @@ extension FocusedValues {
 /// window via `@FocusedValue`; the shared reading store is captured directly.
 struct WorkspaceMenuCommands: Commands {
     let readingStore: ReadingPreferencesStore
+    let recentStore: RecentFoldersStore
     @FocusedValue(\.workspaceCommands) private var actions
 
     var body: some Commands {
@@ -41,6 +43,17 @@ struct WorkspaceMenuCommands: Commands {
             Button("Open Folder…") { actions?.openFolder() }
                 .keyboardShortcut("o", modifiers: .command)
                 .disabled(actions == nil)
+
+            let recents = Array(recentStore.existingEntries().prefix(10))
+            Menu("Open Recent") {
+                ForEach(recents) { folder in
+                    Button(folder.name) { actions?.openRecent(folder.path) }
+                        .help(folder.path)
+                }
+                Divider()
+                Button("Clear Menu") { recentStore.clear() }
+            }
+            .disabled(actions == nil || recents.isEmpty)
         }
 
         CommandGroup(after: .sidebar) {

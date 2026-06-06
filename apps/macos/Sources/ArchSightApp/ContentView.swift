@@ -31,6 +31,7 @@ struct ContentView: View {
     @State private var isQuickOpenPresented = false
     @State private var isShortcutsPresented = false
     @Environment(ReadingPreferencesStore.self) private var readingStore
+    @Environment(RecentFoldersStore.self) private var recentStore
     @Environment(AppCore.self) private var appCore
 
     private var coreEndpoint: CoreServiceEndpoint? { appCore.endpoint }
@@ -87,6 +88,7 @@ struct ContentView: View {
         }
         .focusedValue(\.workspaceCommands, WorkspaceCommandActions(
             openFolder: { openFolderPicker() },
+            openRecent: { path in appendRoots([URL(fileURLWithPath: path)]) },
             toggleSidebar: {
                 withAnimation(.easeInOut(duration: 0.16)) { isSidebarVisible.toggle() }
             },
@@ -258,7 +260,14 @@ struct ContentView: View {
 
     @ViewBuilder
     private var primaryPane: some View {
-        if let tab = selectedTab {
+        if state.roots.isEmpty {
+            WelcomeView(
+                recents: Array(recentStore.existingEntries().prefix(10)),
+                onOpenFolder: { openFolderPicker() },
+                onOpenRecent: { path in appendRoots([URL(fileURLWithPath: path)]) },
+                onRemoveRecent: { path in recentStore.remove(path: path) }
+            )
+        } else if let tab = selectedTab {
             filePane(for: tab, scrollLine: pendingScrollLine)
         } else {
             ContentUnavailableView("Read Only", systemImage: "eye")
@@ -464,6 +473,7 @@ struct ContentView: View {
                 }.value
                 state.workspaceId = result.workspaceId
                 state.roots = result.roots
+                result.roots.forEach { recentStore.record(path: $0.path) }
                 state.entries = result.entries
                 refreshSidebarTreeNodes()
                 state.isLoading = false
@@ -484,6 +494,7 @@ struct ContentView: View {
                     try endpoint.makeController().addRoots(workspaceId: workspaceId, paths: paths)
                 }.value
                 state.roots = result.roots
+                result.roots.forEach { recentStore.record(path: $0.path) }
                 state.entries = result.entries
                 refreshSidebarTreeNodes()
                 state.isLoading = false
