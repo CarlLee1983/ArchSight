@@ -28,3 +28,6 @@ build/
 
 # Superpowers Visual Companion
 .superpowers/
+
+# Claude Code local state (worktrees, scheduled-task locks)
+.claude/
